@@ -128,7 +128,8 @@ def forgot_password(req: schemas.ForgotPasswordRequest, db: Session = Depends(ge
         expires_delta=timedelta(minutes=15)
     )
     
-    reset_link = f"http://localhost:5173/reset-password?token={token}"
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+    reset_link = f"{frontend_url}/reset-password?token={token}"
     
     # Print to console log so it's always accessible in development
     print("\n" + "="*80)

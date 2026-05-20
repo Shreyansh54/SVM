@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: shreyansh-vollora-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: shreyansh-vollora-db
+          property: connectionString
+      - key: SMTP_SERVER
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM_EMAIL
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+
+databases:
+  - name: shreyansh-vollora-db
+    databaseName: vollora
+    user: vollora
+    plan: free
