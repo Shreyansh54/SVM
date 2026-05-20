@@ -138,7 +138,9 @@ def forgot_password(req: schemas.ForgotPasswordRequest, db: Session = Depends(ge
     print(f"User: {user.username}")
     print(f"Email: {email_to}")
     print(f"Reset Link: {reset_link}")
-    print("="*80 + "\n    # Mask email for display: s****h@gmail.com
+    print("="*80 + "\n")
+    
+    # Mask email for display: s****h@gmail.com
     at_idx = email_to.index("@")
     masked_email = email_to[0] + "****" + email_to[at_idx-1:]
     
