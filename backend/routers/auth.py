@@ -1,3 +1,4 @@
+import os
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database import get_db
@@ -142,7 +143,6 @@ def forgot_password(req: schemas.ForgotPasswordRequest, db: Session = Depends(ge
     # Send email
     email_sent = False
     try:
-        import os
         import smtplib
         from email.mime.text import MIMEText
         from email.mime.multipart import MIMEMultipart
