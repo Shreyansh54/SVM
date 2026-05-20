@@ -92,16 +92,23 @@ def delete_employee(
         for user in associated_users:
             db.delete(user)
 
+        # 1. Delete associated Attendance records
+        db.query(models.Attendance).filter(models.Attendance.employee_id == employee_id).delete()
+
+        # 2. Delete associated Salary records
+        db.query(models.Salary).filter(models.Salary.employee_id == employee_id).delete()
+
+        # 3. Delete associated Sales records
+        db.query(models.Sale).filter(models.Sale.employee_id == employee_id).delete()
+
+        # 4. Delete associated Doctor Orders
+        db.query(models.DoctorOrder).filter(models.DoctorOrder.employee_id == employee_id).delete()
+
+        # 5. Delete the employee record itself
         db.delete(emp)
         db.commit()
-        log_action(db, current_user.username, "DELETE_EMPLOYEE", f"Deleted employee {emp_name} (ID: {employee_id}) and their associated user logins.")
-        return {"message": "Employee and associated user accounts deleted"}
+        log_action(db, current_user.username, "DELETE_EMPLOYEE", f"Deleted employee {emp_name} (ID: {employee_id}) and all their associated records (sales, attendance, salary, user login).")
+        return {"message": "Employee and all associated records deleted successfully."}
     except Exception as e:
         db.rollback()
-        import sqlalchemy.exc
-        if isinstance(e, sqlalchemy.exc.IntegrityError):
-            raise HTTPException(
-                status_code=400, 
-                detail="Cannot delete employee. They have associated records (e.g., Sales, Attendance). Please edit them and mark as inactive instead."
-            )
         raise HTTPException(status_code=500, detail=str(e))
