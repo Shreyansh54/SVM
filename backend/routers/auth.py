@@ -138,76 +138,74 @@ def forgot_password(req: schemas.ForgotPasswordRequest, db: Session = Depends(ge
     print(f"User: {user.username}")
     print(f"Email: {email_to}")
     print(f"Reset Link: {reset_link}")
-    print("="*80 + "\n")
+    print("="*80 + "\n    # Mask email for display: s****h@gmail.com
+    at_idx = email_to.index("@")
+    masked_email = email_to[0] + "****" + email_to[at_idx-1:]
+    
+    html = f"""
+    <html>
+      <body style="font-family: Arial, sans-serif; background-color: #F0F6F6; color: #1A3D40; padding: 20px; margin: 0;">
+        <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; padding: 40px; border: 1px solid #E1ECEB; box-shadow: 0 4px 20px rgba(10,55,58,0.08);">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <div style="display: inline-block; background: linear-gradient(135deg, #0A373A, #14A89C); width: 56px; height: 56px; border-radius: 16px; line-height: 56px; color: white; font-weight: bold; font-size: 20px;">SV</div>
+          </div>
+          <h2 style="color: #0A373A; text-align: center; margin-bottom: 8px; font-size: 22px;">SHREYANSH VOLLORA</h2>
+          <p style="text-align: center; color: #14A89C; font-size: 11px; letter-spacing: 2px; font-weight: 600; margin-bottom: 30px;">EVERY STEP GUIDED BY CARE</p>
+          
+          <p style="color: #4A6D71; font-size: 15px;">Hello <strong style="color: #0A373A;">{user.username}</strong>,</p>
+          <p style="color: #4A6D71; font-size: 15px; line-height: 1.6;">We received a request to reset your account password. Click the button below to set a new secure password:</p>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="{reset_link}" style="background: linear-gradient(135deg, #0A373A, #14A89C); color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 12px; font-weight: bold; font-size: 14px; display: inline-block; letter-spacing: 0.5px;">Reset My Password</a>
+          </div>
+          
+          <div style="background-color: #F0F6F6; border-radius: 10px; padding: 16px; margin: 20px 0; border: 1px solid #E1ECEB;">
+            <p style="font-size: 13px; color: #4A6D71; margin: 0; line-height: 1.5;">
+              ⏱ This link will <strong>expire in 15 minutes</strong>.<br/>
+              🔒 If you did not make this request, you can safely ignore this email.
+            </p>
+          </div>
+          
+          <hr style="border: 0; border-top: 1px solid #E1ECEB; margin: 25px 0;" />
+          <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">SHREYANSH VOLLORA PVT LTD &bull; Every Step GUIDED BY CARE</p>
+        </div>
+      </body>
+    </html>
+    """
 
-    # Send email
+    # Send email via Google Apps Script HTTP API (completely bypasses Render SMTP port blocks!)
     email_sent = False
-    try:
-        import smtplib
-        from email.mime.text import MIMEText
-        from email.mime.multipart import MIMEMultipart
+    email_api_url = os.getenv("EMAIL_API_URL")
+    
+    if not email_api_url:
+        print("EMAIL_API_URL is not configured. Email not sent, displaying link in logs.")
+    else:
+        import json
+        import urllib.request
         
-        smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-        smtp_port = int(os.getenv("SMTP_PORT", "587"))
-        smtp_user = os.getenv("SMTP_USERNAME")
-        smtp_pass = os.getenv("SMTP_PASSWORD")
-        from_email = os.getenv("SMTP_FROM_EMAIL", smtp_user or "no-reply@vollora.com")
-
-        if not smtp_user or not smtp_pass:
-            print("SMTP credentials not configured. Email not sent.")
-        else:
-            msg = MIMEMultipart("alternative")
-            msg["Subject"] = "Password Reset Request - SHREYANSH VOLLORA"
-            msg["From"] = f"SHREYANSH VOLLORA <{from_email}>"
-            msg["To"] = email_to
-            
-            # Mask email for display: s****h@gmail.com
-            at_idx = email_to.index("@")
-            masked_email = email_to[0] + "****" + email_to[at_idx-1:]
-            
-            html = f"""
-            <html>
-              <body style="font-family: Arial, sans-serif; background-color: #F0F6F6; color: #1A3D40; padding: 20px; margin: 0;">
-                <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; padding: 40px; border: 1px solid #E1ECEB; box-shadow: 0 4px 20px rgba(10,55,58,0.08);">
-                  <div style="text-align: center; margin-bottom: 30px;">
-                    <div style="display: inline-block; background: linear-gradient(135deg, #0A373A, #14A89C); width: 56px; height: 56px; border-radius: 16px; line-height: 56px; color: white; font-weight: bold; font-size: 20px;">SV</div>
-                  </div>
-                  <h2 style="color: #0A373A; text-align: center; margin-bottom: 8px; font-size: 22px;">SHREYANSH VOLLORA</h2>
-                  <p style="text-align: center; color: #14A89C; font-size: 11px; letter-spacing: 2px; font-weight: 600; margin-bottom: 30px;">EVERY STEP GUIDED BY CARE</p>
-                  
-                  <p style="color: #4A6D71; font-size: 15px;">Hello <strong style="color: #0A373A;">{user.username}</strong>,</p>
-                  <p style="color: #4A6D71; font-size: 15px; line-height: 1.6;">We received a request to reset your account password. Click the button below to set a new secure password:</p>
-                  
-                  <div style="text-align: center; margin: 30px 0;">
-                    <a href="{reset_link}" style="background: linear-gradient(135deg, #0A373A, #14A89C); color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 12px; font-weight: bold; font-size: 14px; display: inline-block; letter-spacing: 0.5px;">Reset My Password</a>
-                  </div>
-                  
-                  <div style="background-color: #F0F6F6; border-radius: 10px; padding: 16px; margin: 20px 0; border: 1px solid #E1ECEB;">
-                    <p style="font-size: 13px; color: #4A6D71; margin: 0; line-height: 1.5;">
-                      ⏱ This link will <strong>expire in 15 minutes</strong>.<br/>
-                      🔒 If you did not make this request, you can safely ignore this email.
-                    </p>
-                  </div>
-                  
-                  <hr style="border: 0; border-top: 1px solid #E1ECEB; margin: 25px 0;" />
-                  <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">SHREYANSH VOLLORA PVT LTD &bull; Every Step GUIDED BY CARE</p>
-                </div>
-              </body>
-            </html>
-            """
-            msg.attach(MIMEText(html, "html"))
-            
-            server = smtplib.SMTP(smtp_server, smtp_port, timeout=15)
-            if smtp_port == 587:
-                server.starttls()
-                
-            server.login(smtp_user, smtp_pass)
-            server.sendmail(from_email, email_to, msg.as_string())
-            server.quit()
-            email_sent = True
-            print(f"Email sent successfully to {email_to}!")
-    except Exception as e:
-        print(f"SMTP Error: {str(e)}")
+        post_data = {
+            "to": email_to,
+            "subject": "Password Reset Request - SHREYANSH VOLLORA",
+            "htmlBody": html
+        }
+        
+        try:
+            req_obj = urllib.request.Request(
+                email_api_url,
+                data=json.dumps(post_data).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST"
+            )
+            with urllib.request.urlopen(req_obj, timeout=15) as resp:
+                resp_text = resp.read().decode("utf-8")
+                resp_data = json.loads(resp_text)
+                if resp_data.get("status") == "success":
+                    email_sent = True
+                    print(f"Email sent successfully via Google Apps Script to {email_to}!")
+                else:
+                    print(f"Google Apps Script Error: {resp_data.get('message')}")
+        except Exception as e:
+            print(f"Failed to send email via HTTP relay: {str(e)}")
     
     # Mask email for response
     at_idx = email_to.index("@")
