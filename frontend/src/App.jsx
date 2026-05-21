@@ -12,6 +12,7 @@ import SalesPage from './pages/SalesPage';
 import StockPage from './pages/StockPage';
 import AttendancePage from './pages/AttendancePage';
 import SalaryPage from './pages/SalaryPage';
+import CollectionsPage from './pages/CollectionsPage';
 import ReportsPage from './pages/ReportsPage';
 import DoctorsPage from './pages/DoctorsPage';
 import BatchesPage from './pages/BatchesPage';
@@ -42,6 +43,7 @@ export default function App() {
             {/* Role protected routes using robust RoleRoute */}
             <Route path="employees" element={<RoleRoute allowedRoles={['admin', 'hr']}><EmployeesPage /></RoleRoute>} />
             <Route path="salary" element={<RoleRoute allowedRoles={['admin', 'hr']}><SalaryPage /></RoleRoute>} />
+            <Route path="collections" element={<RoleRoute allowedRoles={['admin', 'manager', 'hr']}><CollectionsPage /></RoleRoute>} />
             <Route path="reports" element={<RoleRoute allowedRoles={['admin', 'manager', 'hr']}><ReportsPage /></RoleRoute>} />
             <Route path="audit-logs" element={<RoleRoute allowedRoles={['admin']}><AuditLogsPage /></RoleRoute>} />
             

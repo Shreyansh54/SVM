@@ -9,7 +9,7 @@ if os.path.exists(".env"):
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Base
-from routers import auth, employees, stockists, products, stock, sales, attendance, salary, dashboard, doctors, export, upload, batches, invoices, audit
+from routers import auth, employees, stockists, products, stock, sales, attendance, salary, dashboard, doctors, export, upload, batches, invoices, audit, collections
 
 # Create all tables
 Base.metadata.create_all(bind=engine)
@@ -41,6 +41,7 @@ app.include_router(upload.router)
 app.include_router(batches.router)
 app.include_router(invoices.router)
 app.include_router(audit.router)
+app.include_router(collections.router)
 
 
 @app.get("/")

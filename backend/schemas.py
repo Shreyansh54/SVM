@@ -406,3 +406,46 @@ class DoctorOrderOut(BaseModel):
 class ChangePasswordRequest(BaseModel):
     new_password: str
 
+
+# ─── Collections ────────────────────────────────────────
+class CollectionCreate(BaseModel):
+    collection_type: str  # "stockist" or "doctor"
+    stockist_id: Optional[int] = None
+    doctor_id: Optional[int] = None
+    employee_id: Optional[int] = None
+    amount: float
+    payment_mode: str = "Cash"
+    date: date
+    remarks: Optional[str] = None
+
+
+class CollectionUpdate(BaseModel):
+    collection_type: Optional[str] = None
+    stockist_id: Optional[int] = None
+    doctor_id: Optional[int] = None
+    employee_id: Optional[int] = None
+    amount: Optional[float] = None
+    payment_mode: Optional[str] = None
+    date: Optional[date] = None
+    remarks: Optional[str] = None
+
+
+class CollectionOut(BaseModel):
+    id: int
+    collection_type: str
+    stockist_id: Optional[int] = None
+    doctor_id: Optional[int] = None
+    employee_id: Optional[int] = None
+    amount: float
+    payment_mode: str
+    date: date
+    remarks: Optional[str] = None
+    
+    stockist_name: Optional[str] = None
+    doctor_name: Optional[str] = None
+    employee_name: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+

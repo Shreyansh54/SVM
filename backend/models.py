@@ -224,3 +224,22 @@ class AuditLog(Base):
     timestamp = Column(DateTime, server_default=func.now())
 
 
+class Collection(Base):
+    __tablename__ = "collections"
+
+    id = Column(Integer, primary_key=True, index=True)
+    collection_type = Column(String, nullable=False)  # "stockist" or "doctor"
+    stockist_id = Column(Integer, ForeignKey("stockists.id"), nullable=True)
+    doctor_id = Column(Integer, ForeignKey("doctors.id"), nullable=True)
+    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=True)  # MR who collected it
+    amount = Column(Float, nullable=False)
+    payment_mode = Column(String, default="Cash")  # UPI, Cash, Cheque, Bank Transfer
+    date = Column(Date, nullable=False)
+    remarks = Column(String, nullable=True)
+
+    stockist = relationship("Stockist")
+    doctor = relationship("Doctor")
+    employee = relationship("Employee")
+
+
+
