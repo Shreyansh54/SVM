@@ -157,14 +157,28 @@ export default function CollectionsPage() {
     }
   };
 
+  const downloadFile = async (url, filename) => {
+    try {
+      toast.loading('Generating report...', { id: 'download' });
+      const res = await api.get(url, { responseType: 'blob' });
+      const blob = new Blob([res.data]);
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(link.href);
+      toast.success('Report downloaded!', { id: 'download' });
+    } catch (err) {
+      toast.error('Failed to download report', { id: 'download' });
+    }
+  };
+
   const handleDownloadPDF = () => {
-    const apiURL = api.defaults.baseURL || '';
-    window.open(`${apiURL}/collections/export/pdf?month=${filterMonth}&year=${filterYear}`, '_blank');
+    downloadFile(`/collections/export/pdf?month=${filterMonth}&year=${filterYear}`, `collections_report_${filterMonth}_${filterYear}.pdf`);
   };
 
   const handleDownloadExcel = () => {
-    const apiURL = api.defaults.baseURL || '';
-    window.open(`${apiURL}/collections/export/excel?month=${filterMonth}&year=${filterYear}`, '_blank');
+    downloadFile(`/collections/export/excel?month=${filterMonth}&year=${filterYear}`, `collections_report_${filterMonth}_${filterYear}.xlsx`);
   };
 
   const months = [
