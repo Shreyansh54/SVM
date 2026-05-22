@@ -5,6 +5,7 @@ from datetime import datetime, date
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
+from sqlalchemy import extract
 from sqlalchemy.orm import Session
 from database import get_db
 from auth import require_role, log_action
@@ -128,9 +129,9 @@ def get_collections(
     query = db.query(models.Collection)
     
     if month is not None:
-        query = query.filter(models.extract('month', models.Collection.date) == month)
+        query = query.filter(extract('month', models.Collection.date) == month)
     if year is not None:
-        query = query.filter(models.extract('year', models.Collection.date) == year)
+        query = query.filter(extract('year', models.Collection.date) == year)
     if collection_type:
         query = query.filter(models.Collection.collection_type == collection_type)
     if stockist_id:
@@ -192,8 +193,8 @@ def get_collections_summary(
     current_user: models.User = Depends(require_role("admin", "manager", "hr"))
 ):
     cols = db.query(models.Collection).filter(
-        models.extract('month', models.Collection.date) == month,
-        models.extract('year', models.Collection.date) == year
+        extract('month', models.Collection.date) == month,
+        extract('year', models.Collection.date) == year
     ).all()
     
     total_stockist = 0.0
@@ -234,8 +235,8 @@ def export_collections_excel(
     current_user: models.User = Depends(require_role("admin", "manager", "hr"))
 ):
     cols = db.query(models.Collection).filter(
-        models.extract('month', models.Collection.date) == month,
-        models.extract('year', models.Collection.date) == year
+        extract('month', models.Collection.date) == month,
+        extract('year', models.Collection.date) == year
     ).order_by(models.Collection.date.desc()).all()
     
     for c in cols:
@@ -290,8 +291,8 @@ def export_collections_pdf(
     current_user: models.User = Depends(require_role("admin", "manager", "hr"))
 ):
     cols = db.query(models.Collection).filter(
-        models.extract('month', models.Collection.date) == month,
-        models.extract('year', models.Collection.date) == year
+        extract('month', models.Collection.date) == month,
+        extract('year', models.Collection.date) == year
     ).order_by(models.Collection.date.desc()).all()
     
     for c in cols:
