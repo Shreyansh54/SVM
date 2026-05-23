@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, extract
 from typing import List
 from datetime import datetime
+import uuid
 from database import get_db
 from auth import get_current_user, require_role
 import models
@@ -15,6 +16,7 @@ def sale_to_out(s: models.Sale) -> schemas.SaleOut:
     return schemas.SaleOut(
         id=s.id, employee_id=s.employee_id,
         invoice_number=s.invoice_number,
+        sale_order_id=s.sale_order_id,
         sale_type=s.sale_type or "stockist",
         stockist_id=s.stockist_id,
         doctor_id=s.doctor_id,
@@ -132,6 +134,124 @@ def create_sale(
     db.commit()
     db.refresh(db_sale)
     return sale_to_out(db_sale)
+
+
+@router.post("/bulk", response_model=List[schemas.SaleOut])
+def create_bulk_sale(
+    order: schemas.BulkSaleCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Create a multi-product order in one request. All items share one sale_order_id."""
+    if not order.items:
+        raise HTTPException(status_code=400, detail="Order must have at least one product line.")
+
+    # Enforce employee constraint for employee-role users
+    if current_user.role == "employee":
+        if not current_user.employee_id:
+            raise HTTPException(status_code=403, detail="Your account is not linked to an employee record")
+        order.employee_id = current_user.employee_id
+
+    # Validate employee
+    employee = db.query(models.Employee).filter(models.Employee.id == order.employee_id).first()
+    if not employee:
+        raise HTTPException(status_code=404, detail="Employee not found")
+
+    # Validate sale type and party
+    sale_type = order.sale_type or "stockist"
+    if sale_type not in ("stockist", "doctor"):
+        raise HTTPException(status_code=400, detail="sale_type must be 'stockist' or 'doctor'")
+
+    if sale_type == "stockist":
+        if not order.stockist_id:
+            raise HTTPException(status_code=400, detail="stockist_id required for stockist order")
+        if not db.query(models.Stockist).filter(models.Stockist.id == order.stockist_id).first():
+            raise HTTPException(status_code=404, detail="Stockist not found")
+    else:
+        if not order.doctor_id:
+            raise HTTPException(status_code=400, detail="doctor_id required for doctor order")
+        if not db.query(models.Doctor).filter(models.Doctor.id == order.doctor_id).first():
+            raise HTTPException(status_code=404, detail="Doctor not found")
+
+    # ── Validate all items BEFORE creating anything (atomic) ──
+    resolved = []  # (item, product, batch, stock_obj_or_None)
+    for idx, item in enumerate(order.items, 1):
+        if item.quantity_sold <= 0:
+            raise HTTPException(status_code=400, detail=f"Line {idx}: quantity_sold must be > 0")
+
+        product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
+        if not product:
+            raise HTTPException(status_code=404, detail=f"Line {idx}: Product #{item.product_id} not found")
+
+        batch = None
+        if item.batch_id:
+            batch = db.query(models.Batch).filter(models.Batch.id == item.batch_id).first()
+            if not batch:
+                raise HTTPException(status_code=404, detail=f"Line {idx}: Batch not found")
+            if batch.status == "recalled":
+                raise HTTPException(status_code=400, detail=f"Line {idx}: Cannot sell from a recalled batch")
+            if batch.status == "expired":
+                raise HTTPException(status_code=400, detail=f"Line {idx}: Cannot sell from an expired batch")
+
+        stock = None
+        if sale_type == "stockist":
+            sq = db.query(models.Stock).filter(
+                models.Stock.stockist_id == order.stockist_id,
+                models.Stock.product_id == item.product_id
+            )
+            if item.batch_id:
+                sq = sq.filter(models.Stock.batch_id == item.batch_id)
+            stock = sq.first()
+            need = item.quantity_sold + (item.bonus_quantity or 0)
+            if not stock or stock.quantity < need:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Line {idx} ({product.name}): Insufficient stock (need {need}, have {stock.quantity if stock else 0})"
+                )
+
+        resolved.append((item, product, batch, stock))
+
+    # ── All valid — generate shared order ID and create records ──
+    sale_order_id = f"ORD-{datetime.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
+    current_month = datetime.now().strftime("%Y%m")
+    created_sales = []
+
+    for line_num, (item, product, batch, stock) in enumerate(resolved, 1):
+        # Deduct stock for stockist sales
+        if sale_type == "stockist" and stock:
+            stock.quantity -= (item.quantity_sold + (item.bonus_quantity or 0))
+
+        # Price calculation
+        unit_price = batch.mrp if batch else product.price
+        discount = max(0.0, min(100.0, item.discount_percentage or 0.0))
+        discounted_price = unit_price * (1 - discount / 100)
+        total_amount = item.quantity_sold * discounted_price
+
+        db_sale = models.Sale(
+            employee_id=order.employee_id,
+            sale_type=sale_type,
+            stockist_id=order.stockist_id if sale_type == "stockist" else None,
+            doctor_id=order.doctor_id if sale_type == "doctor" else None,
+            product_id=item.product_id,
+            batch_id=item.batch_id,
+            quantity_sold=item.quantity_sold,
+            bonus_quantity=max(0, item.bonus_quantity or 0),
+            discount_percentage=discount,
+            total_amount=total_amount,
+            sale_order_id=sale_order_id,
+        )
+        db.add(db_sale)
+        db.flush()  # get ID
+
+        suffix = f"-{line_num}" if line_num > 1 else ""
+        db_sale.invoice_number = f"INV-{current_month}-{db_sale.id:05d}{suffix}"
+        created_sales.append(db_sale)
+
+    db.commit()
+    for s in created_sales:
+        db.refresh(s)
+
+    return [sale_to_out(s) for s in created_sales]
 
 
 @router.get("/", response_model=List[schemas.SaleOut])

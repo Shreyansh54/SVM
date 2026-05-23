@@ -248,6 +248,7 @@ class SaleCreate(BaseModel):
 class SaleOut(BaseModel):
     id: int
     invoice_number: Optional[str] = None
+    sale_order_id: Optional[str] = None
     employee_id: int
     sale_type: str
     stockist_id: Optional[int] = None
@@ -267,6 +268,25 @@ class SaleOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ─── Bulk / Multi-Product Sale ───────────────────────────
+class SaleLineItem(BaseModel):
+    """One product row within a multi-product order."""
+    product_id: int
+    batch_id: Optional[int] = None
+    quantity_sold: int
+    bonus_quantity: int = 0
+    discount_percentage: float = 0.0
+
+
+class BulkSaleCreate(BaseModel):
+    """Full multi-product order submitted in one shot."""
+    employee_id: int
+    sale_type: str = "stockist"   # "stockist" or "doctor"
+    stockist_id: Optional[int] = None
+    doctor_id: Optional[int] = None
+    items: List[SaleLineItem]    # must have at least 1 item
 
 
 # ─── Attendance ──────────────────────────────────────────

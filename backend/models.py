@@ -122,9 +122,10 @@ class Sale(Base):
     doctor_id = Column(Integer, ForeignKey("doctors.id"), nullable=True)
     discount_percentage = Column(Float, default=0.0)
     quantity_sold = Column(Integer, nullable=False)
-    bonus_quantity = Column(Integer, default=0)  # free units for doctor sales
+    bonus_quantity = Column(Integer, default=0)  # free units given to stockist or doctor
     total_amount = Column(Float, nullable=False)
     date = Column(DateTime, server_default=func.now())
+    sale_order_id = Column(String, nullable=True, index=True)  # groups multi-product line items under one order
 
     employee = relationship("Employee", back_populates="sales")
     stockist = relationship("Stockist", back_populates="sales")
