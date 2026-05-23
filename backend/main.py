@@ -11,8 +11,25 @@ from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Base
 from routers import auth, employees, stockists, products, stock, sales, attendance, salary, dashboard, doctors, export, upload, batches, invoices, audit, collections
 
-# Create all tables
+# Create all new tables
 Base.metadata.create_all(bind=engine)
+
+# ── Safe column migrations (run on every deploy, IF NOT EXISTS is idempotent) ──
+def run_migrations():
+    with engine.connect() as conn:
+        migrations = [
+            # sale_order_id groups multi-product line items under one order
+            "ALTER TABLE sales ADD COLUMN IF NOT EXISTS sale_order_id VARCHAR",
+            # collections table created fresh — no migration needed, but kept for safety
+        ]
+        for sql in migrations:
+            try:
+                conn.execute(__import__('sqlalchemy').text(sql))
+                conn.commit()
+            except Exception as e:
+                print(f"Migration skipped ({sql[:60]}...): {e}")
+
+run_migrations()
 
 app = FastAPI(title="SHREYANSH VOLLORA - Every Step GUIDED BY CARE", version="2.0.0")
 
