@@ -22,6 +22,7 @@ def sale_to_out(s: models.Sale) -> schemas.SaleOut:
         doctor_id=s.doctor_id,
         product_id=s.product_id, batch_id=s.batch_id,
         quantity_sold=s.quantity_sold, bonus_quantity=s.bonus_quantity or 0,
+        gst_rate=s.gst_rate if s.gst_rate is not None else 5.0,
         total_amount=s.total_amount,
         discount_percentage=s.discount_percentage or 0.0,
         date=s.date,
@@ -111,7 +112,9 @@ def create_sale(
     else:
         discounted_price = unit_price
 
-    total_amount = sale.quantity_sold * discounted_price
+    total_before_gst = sale.quantity_sold * discounted_price
+    gst_rate = 5.0  # 5% GST
+    total_amount = round(total_before_gst * (1 + gst_rate / 100), 2)
 
     # Allow bonus/free goods for both stockist and doctor sales
     bonus = max(0, sale.bonus_quantity or 0)
@@ -125,6 +128,7 @@ def create_sale(
         quantity_sold=sale.quantity_sold,
         bonus_quantity=bonus,
         discount_percentage=discount,
+        gst_rate=gst_rate,
         total_amount=total_amount
     )
     db.add(db_sale)
@@ -221,11 +225,12 @@ def create_bulk_sale(
         if sale_type == "stockist" and stock:
             stock.quantity -= (item.quantity_sold + (item.bonus_quantity or 0))
 
-        # Price calculation
+        # Price calculation with 5% GST
         unit_price = batch.mrp if batch else product.price
         discount = max(0.0, min(100.0, item.discount_percentage or 0.0))
         discounted_price = unit_price * (1 - discount / 100)
-        total_amount = item.quantity_sold * discounted_price
+        gst_rate = 5.0
+        total_amount = round(item.quantity_sold * discounted_price * (1 + gst_rate / 100), 2)
 
         db_sale = models.Sale(
             employee_id=order.employee_id,
@@ -237,6 +242,7 @@ def create_bulk_sale(
             quantity_sold=item.quantity_sold,
             bonus_quantity=max(0, item.bonus_quantity or 0),
             discount_percentage=discount,
+            gst_rate=gst_rate,
             total_amount=total_amount,
             sale_order_id=sale_order_id,
         )

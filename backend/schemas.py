@@ -257,6 +257,7 @@ class SaleOut(BaseModel):
     batch_id: Optional[int] = None
     quantity_sold: int
     bonus_quantity: int = 0
+    gst_rate: float = 5.0
     total_amount: float
     discount_percentage: float
     date: Optional[datetime] = None
@@ -278,6 +279,7 @@ class SaleLineItem(BaseModel):
     quantity_sold: int
     bonus_quantity: int = 0
     discount_percentage: float = 0.0
+    gst_rate: float = 5.0  # default 5% GST
 
 
 class BulkSaleCreate(BaseModel):

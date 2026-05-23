@@ -67,7 +67,8 @@ export default function SalesPage() {
     setOrder(o => ({ ...o, items: o.items.filter((_, i) => i !== idx) }));
   };
 
-  // ── Live price preview per line ────────────────────────
+  // ── Live price preview per line (with 5% GST) ────────
+  const GST_RATE = 5.0;
   const linePreview = (item) => {
     if (!item.product_id || !item.quantity_sold) return null;
     const product = products.find(p => p.id == item.product_id);
@@ -81,13 +82,23 @@ export default function SalesPage() {
     const discountedPrice = unitPrice * (1 - discount / 100);
     const qty = parseInt(item.quantity_sold || 0);
     const bonus = parseInt(item.bonus_quantity || 0);
-    return { unitPrice, discountedPrice, total: qty * discountedPrice, discount, bonus, qty };
+    const subtotal = qty * discountedPrice;
+    const gstAmount = subtotal * (GST_RATE / 100);
+    const total = subtotal + gstAmount;
+    return { unitPrice, discountedPrice, subtotal, gstAmount, total, discount, bonus, qty };
   };
 
   const orderTotal = order.items.reduce((sum, it) => {
     const p = linePreview(it);
     return sum + (p ? p.total : 0);
   }, 0);
+
+  const orderSubtotal = order.items.reduce((sum, it) => {
+    const p = linePreview(it);
+    return sum + (p ? p.subtotal : 0);
+  }, 0);
+
+  const orderGst = orderSubtotal * (GST_RATE / 100);
 
   // ── Submit ─────────────────────────────────────────────
   const handleSubmit = async (e) => {
@@ -371,10 +382,12 @@ export default function SalesPage() {
                       </div>
 
                       {/* Per-line mini preview */}
-                      {prev && (prev.bonus > 0 || prev.discount > 0) && (
-                        <div className="flex gap-4 text-xs pl-1">
+                      {prev && (
+                        <div className="flex flex-wrap gap-3 text-xs pl-1 pt-0.5">
                           {prev.discount > 0 && <span className="text-amber-500">📉 {prev.discount}% off → ₹{prev.discountedPrice.toFixed(2)}/unit</span>}
-                          {prev.bonus > 0 && <span className="text-emerald-500">🎁 {prev.qty} billed + {prev.bonus} free = {prev.qty + prev.bonus} units dispatched</span>}
+                          {prev.bonus > 0 && <span className="text-emerald-500">🎁 {prev.qty} billed + {prev.bonus} free</span>}
+                          <span className="text-gray-400">Subtotal: ₹{prev.subtotal.toFixed(2)}</span>
+                          <span className="text-orange-400 font-semibold">+GST 5%: ₹{prev.gstAmount.toFixed(2)}</span>
                         </div>
                       )}
                     </div>
@@ -387,13 +400,21 @@ export default function SalesPage() {
                 </button>
               </div>
 
-              {/* ── ORDER TOTAL ── */}
-              <div className="bg-gradient-to-r from-[#0A373A] to-[#14A89C] rounded-xl p-4 flex items-center justify-between text-white">
-                <div>
-                  <p className="text-xs text-white/70 font-semibold uppercase tracking-widest">Order Total</p>
-                  <p className="text-xs text-white/60 mt-0.5">{order.items.length} product line(s)</p>
+              {/* ── ORDER TOTAL with GST breakdown ── */}
+              <div className="bg-gradient-to-r from-[#0A373A] to-[#14A89C] rounded-xl p-4 text-white space-y-2">
+                <p className="text-xs text-white/70 font-semibold uppercase tracking-widest mb-2">Order Summary</p>
+                <div className="flex justify-between text-sm text-white/80">
+                  <span>Subtotal ({order.items.length} line{order.items.length > 1 ? 's' : ''})</span>
+                  <span>₹{orderSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
-                <p className="text-2xl font-bold">₹{orderTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                <div className="flex justify-between text-sm text-orange-200">
+                  <span>GST @ 5%</span>
+                  <span>₹{orderGst.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between text-lg font-bold border-t border-white/20 pt-2">
+                  <span>Grand Total (incl. GST)</span>
+                  <span>₹{orderTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
               </div>
 
               {/* ── Actions ── */}

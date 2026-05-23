@@ -20,7 +20,8 @@ def run_migrations():
         migrations = [
             # sale_order_id groups multi-product line items under one order
             "ALTER TABLE sales ADD COLUMN IF NOT EXISTS sale_order_id VARCHAR",
-            # collections table created fresh — no migration needed, but kept for safety
+            # gst_rate stores the GST % applied to each sale line (default 5%)
+            "ALTER TABLE sales ADD COLUMN IF NOT EXISTS gst_rate FLOAT DEFAULT 5.0",
         ]
         for sql in migrations:
             try:

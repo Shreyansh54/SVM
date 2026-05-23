@@ -123,7 +123,8 @@ class Sale(Base):
     discount_percentage = Column(Float, default=0.0)
     quantity_sold = Column(Integer, nullable=False)
     bonus_quantity = Column(Integer, default=0)  # free units given to stockist or doctor
-    total_amount = Column(Float, nullable=False)
+    gst_rate = Column(Float, default=5.0)         # GST % applied to this sale line
+    total_amount = Column(Float, nullable=False)   # amount AFTER discount and INCLUSIVE of GST
     date = Column(DateTime, server_default=func.now())
     sale_order_id = Column(String, nullable=True, index=True)  # groups multi-product line items under one order
 
