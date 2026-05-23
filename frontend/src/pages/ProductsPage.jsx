@@ -4,7 +4,7 @@ import api from '../api';
 import toast from 'react-hot-toast';
 import { HiOutlinePlus, HiOutlinePencil, HiOutlineTrash, HiOutlineX, HiOutlineSearch, HiOutlineUpload } from 'react-icons/hi';
 
-const SCHEDULE_TYPES = ['OTC', 'H', 'H1', 'X', 'G', 'J'];
+const SCHEDULE_TYPES = ['OTC', 'H', 'H1', 'X', 'G', 'Narcotic'];
 const CATEGORIES = ['Tablet', 'Capsule', 'Syrup', 'Injection', 'Ointment', 'Drops', 'Powder', 'Inhaler', 'Suspension', 'Gel', 'Cream', 'Other'];
 
 export default function ProductsPage() {
@@ -15,7 +15,7 @@ export default function ProductsPage() {
   const [filterCat, setFilterCat] = useState('');
   const [viewDetail, setViewDetail] = useState(null);
   const INITIAL_FORM = {
-    name: '', category: '', price: '', generic_name: '', 
+    name: '', category: '', mrp: '', pts: '', prp: '', generic_name: '', 
     composition: '', dosage: '', packaging: '', manufacturer: '', schedule_type: '', hsn_code: ''
   };
   const [form, setForm] = useState(INITIAL_FORM);
@@ -32,7 +32,12 @@ export default function ProductsPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const data = { ...form, price: parseFloat(form.price) };
+    const data = { 
+      ...form, 
+      mrp: parseFloat(form.mrp || 0), 
+      pts: parseFloat(form.pts || 0), 
+      prp: parseFloat(form.prp || 0) 
+    };
     try {
       if (editing) { await api.put(`/products/${editing.id}`, data); toast.success('Medicine updated'); }
       else { await api.post('/products/', data); toast.success('Medicine added'); }
@@ -48,7 +53,7 @@ export default function ProductsPage() {
   const handleEdit = (p) => {
     setEditing(p);
     setForm({
-      name: p.name, category: p.category || '', price: p.price,
+      name: p.name, category: p.category || '', mrp: p.mrp || '', pts: p.pts || '', prp: p.prp || '',
       generic_name: p.generic_name || '', composition: p.composition || '',
       dosage: p.dosage || '', packaging: p.packaging || '', manufacturer: p.manufacturer || '', 
       schedule_type: p.schedule_type || '', hsn_code: p.hsn_code || ''
@@ -79,7 +84,7 @@ export default function ProductsPage() {
   };
 
   const scheduleColor = (s) => {
-    const map = { 'H': 'bg-red-500/15 text-red-400', 'H1': 'bg-orange-500/15 text-orange-400', 'X': 'bg-red-600/20 text-red-300', 'G': 'bg-blue-500/15 text-blue-400', 'OTC': 'bg-emerald-500/15 text-emerald-400', 'J': 'bg-purple-500/15 text-purple-400' };
+    const map = { 'H': 'bg-red-500/15 text-red-400', 'H1': 'bg-orange-500/15 text-orange-400', 'X': 'bg-red-600/20 text-red-300', 'G': 'bg-blue-500/15 text-blue-400', 'OTC': 'bg-emerald-500/15 text-emerald-400', 'J': 'bg-purple-500/15 text-purple-400', 'Narcotic': 'bg-red-900/20 text-red-500' };
     return map[s] || 'bg-gray-500/15 text-gray-400';
   };
 
@@ -111,12 +116,10 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      {/* Excel format hint */}
       <div className="text-xs text-gray-600 bg-[#E3EFEF] rounded-lg px-4 py-2 border border-[#D5E5E4]">
-        💡 <strong>Excel format:</strong> Name, Price, Category, Generic Name, Composition, Dosage, Packaging, Manufacturer, HSN Code, Schedule Type
+        💡 <strong>Excel format:</strong> Name, MRP, PTS, PRP, Category, Generic Name, Composition, Dosage, Packaging, Manufacturer, HSN Code, Schedule Type
       </div>
 
-      {/* Search + Filter */}
       <div className="flex gap-3 items-end flex-wrap">
         <div className="flex-1 min-w-[200px]">
           <div className="relative">
@@ -140,9 +143,10 @@ export default function ProductsPage() {
               <th className="px-4 py-3 text-left">Medicine</th>
               <th className="px-4 py-3 text-left">Generic Name</th>
               <th className="px-4 py-3 text-left">Category</th>
-              <th className="px-4 py-3 text-left">Manufacturer</th>
               <th className="px-4 py-3 text-center">Schedule</th>
-              <th className="px-4 py-3 text-right">Price (₹)</th>
+              <th className="px-4 py-3 text-right">MRP (₹)</th>
+              <th className="px-4 py-3 text-right">PTS (₹)</th>
+              <th className="px-4 py-3 text-right">PRP (₹)</th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr></thead>
             <tbody>
@@ -154,7 +158,6 @@ export default function ProductsPage() {
                   </td>
                   <td className="px-4 py-3 text-gray-400 text-sm italic">{p.generic_name || '—'}</td>
                   <td className="px-4 py-3">{p.category ? <span className="badge-info">{p.category}</span> : '—'}</td>
-                  <td className="px-4 py-3 text-gray-400 text-sm">{p.manufacturer || '—'}</td>
                   <td className="px-4 py-3 text-center">
                     {p.schedule_type ? (
                       <span className={`px-2 py-0.5 rounded-lg text-xs font-semibold ${scheduleColor(p.schedule_type)}`}>
@@ -162,7 +165,9 @@ export default function ProductsPage() {
                       </span>
                     ) : '—'}
                   </td>
-                  <td className="px-4 py-3 text-right font-semibold text-emerald-400">₹{p.price?.toLocaleString()}</td>
+                  <td className="px-4 py-3 text-right font-medium text-[#1A3D40]">{p.mrp ? p.mrp.toFixed(2) : '—'}</td>
+                  <td className="px-4 py-3 text-right font-medium text-[#1A3D40]">{p.pts ? p.pts.toFixed(2) : '—'}</td>
+                  <td className="px-4 py-3 text-right font-medium text-[#1A3D40]">{p.prp ? p.prp.toFixed(2) : '—'}</td>
                   <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
                     <div className="flex justify-end gap-1">
                       <button onClick={() => handleEdit(p)} className="p-1.5 rounded-lg text-gray-400 hover:text-primary-400 hover:bg-primary-500/10 transition-all"><HiOutlinePencil className="w-4 h-4" /></button>
@@ -171,7 +176,7 @@ export default function ProductsPage() {
                   </td>
                 </tr>
               ))}
-              {filtered.length === 0 && <tr><td colSpan="7" className="px-4 py-12 text-center text-gray-500">No medicines found</td></tr>}
+              {filtered.length === 0 && <tr><td colSpan="8" className="px-4 py-12 text-center text-gray-500">No medicines found</td></tr>}
             </tbody>
           </table>
         </div>
@@ -192,7 +197,6 @@ export default function ProductsPage() {
                 </div>
                 <div>
                   <h3 className="text-xl font-bold text-[#1A3D40]">{viewDetail.name}</h3>
-                  {viewDetail.generic_name && <p className="text-sm text-gray-400 italic">{viewDetail.generic_name}</p>}
                 </div>
                 {viewDetail.schedule_type && (
                   <span className={`ml-auto px-3 py-1 rounded-xl text-xs font-bold ${scheduleColor(viewDetail.schedule_type)}`}>
@@ -201,14 +205,18 @@ export default function ProductsPage() {
                 )}
               </div>
               {[
+                ['Generic Name', viewDetail.generic_name],
                 ['Composition', viewDetail.composition],
-                ['Dosage Form', viewDetail.dosage],
+                ['Dosage', viewDetail.dosage],
                 ['Category', viewDetail.category],
                 ['Packaging', viewDetail.packaging],
                 ['Manufacturer', viewDetail.manufacturer],
-                ['Base Price', `₹${viewDetail.price?.toLocaleString()}`],
+                ['HSN Code', viewDetail.hsn_code],
+                ['MRP (₹)', viewDetail.mrp ? viewDetail.mrp.toFixed(2) : '—'],
+                ['PTS (₹)', viewDetail.pts ? viewDetail.pts.toFixed(2) : '—'],
+                ['PRP (₹)', viewDetail.prp ? viewDetail.prp.toFixed(2) : '—']
               ].map(([label, value]) => value ? (
-                <div key={label} className="flex justify-between py-2 border-b border-white/5">
+                <div key={label} className="flex justify-between py-2 border-b border-gray-100">
                   <span className="text-sm text-gray-500">{label}</span>
                   <span className="text-sm text-[#1A3D40] font-medium text-right max-w-[60%]">{value}</span>
                 </div>
@@ -272,12 +280,23 @@ export default function ProductsPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1">Base Price (₹) *</label>
-                  <input type="number" step="0.01" value={form.price} onChange={e => setForm({...form, price: e.target.value})} className="input-field" required />
-                </div>
-                <div>
                   <label className="block text-sm text-gray-400 mb-1">HSN Code</label>
                   <input value={form.hsn_code} onChange={e => setForm({...form, hsn_code: e.target.value})} className="input-field" placeholder="e.g. 30049099" />
+                </div>
+                <div className="col-span-2 pt-2 pb-1 border-b border-gray-100">
+                  <h3 className="text-sm font-semibold text-[#1A3D40] tracking-wide uppercase">Pricing Tiers</h3>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">MRP (₹) *</label>
+                  <input type="number" step="0.01" min="0" value={form.mrp} onChange={e => setForm({...form, mrp: e.target.value})} className="input-field" required />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">PTS (₹) <span className="text-xs text-gray-400">(Price to Stockist)</span> *</label>
+                  <input type="number" step="0.01" min="0" value={form.pts} onChange={e => setForm({...form, pts: e.target.value})} className="input-field" required />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">PRP (₹) <span className="text-xs text-gray-400">(Price to Retailer/Purchaser)</span> *</label>
+                  <input type="number" step="0.01" min="0" value={form.prp} onChange={e => setForm({...form, prp: e.target.value})} className="input-field" required />
                 </div>
               </div>
               <div className="flex gap-3 pt-2">

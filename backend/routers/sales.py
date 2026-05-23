@@ -99,11 +99,12 @@ def create_sale(
         # Deduct sold + bonus (free goods) quantity from stock
         stock.quantity -= (sale.quantity_sold + (sale.bonus_quantity or 0))
 
-    # Calculate price
-    if sale.batch_id and batch:
+    # Calculate price based on selected price tier
+    price_type = sale.applied_price_type or "mrp"
+    if price_type == "mrp" and sale.batch_id and batch:
         unit_price = batch.mrp
     else:
-        unit_price = product.price
+        unit_price = getattr(product, price_type, product.price)
 
     # Apply discount for doctor sales
     discount = max(0, min(100, sale.discount_percentage or 0))
@@ -225,8 +226,13 @@ def create_bulk_sale(
         if sale_type == "stockist" and stock:
             stock.quantity -= (item.quantity_sold + (item.bonus_quantity or 0))
 
-        # Price calculation with 5% GST
-        unit_price = batch.mrp if batch else product.price
+        # Price calculation based on selected price tier
+        price_type = item.applied_price_type or "mrp"
+        if price_type == "mrp" and batch:
+            unit_price = batch.mrp
+        else:
+            unit_price = getattr(product, price_type, product.price)
+            
         discount = max(0.0, min(100.0, item.discount_percentage or 0.0))
         discounted_price = unit_price * (1 - discount / 100)
         gst_rate = 5.0

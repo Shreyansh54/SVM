@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import { HiOutlinePlus, HiOutlineDownload, HiOutlineX, HiOutlineTrash } from 'react-icons/hi';
 import { useAuth } from '../context/AuthContext';
 
-const BLANK_LINE = { product_id: '', batch_id: '', quantity_sold: '', bonus_quantity: '0', discount_percentage: '0' };
+const BLANK_LINE = { product_id: '', batch_id: '', quantity_sold: '', bonus_quantity: '0', discount_percentage: '0', applied_price_type: 'mrp' };
 
 const BLANK_ORDER = {
   employee_id: '', sale_type: 'stockist', stockist_id: '', doctor_id: '',
@@ -73,10 +73,10 @@ export default function SalesPage() {
     if (!item.product_id || !item.quantity_sold) return null;
     const product = products.find(p => p.id == item.product_id);
     if (!product) return null;
-    let unitPrice = product.price;
-    if (item.batch_id) {
+    let unitPrice = product[item.applied_price_type] || product.price; // fallback to generic price if tier is 0
+    if (item.applied_price_type === 'mrp' && item.batch_id) {
       const b = batches.find(b => b.id == item.batch_id);
-      if (b) unitPrice = b.mrp;
+      if (b && b.mrp) unitPrice = b.mrp;
     }
     const discount = parseFloat(item.discount_percentage || 0);
     const discountedPrice = unitPrice * (1 - discount / 100);
@@ -124,8 +124,9 @@ export default function SalesPage() {
           product_id: parseInt(it.product_id),
           batch_id: it.batch_id ? parseInt(it.batch_id) : null,
           quantity_sold: parseInt(it.quantity_sold),
-          bonus_quantity: parseInt(it.bonus_quantity || 0),
-          discount_percentage: parseFloat(it.discount_percentage || 0),
+          bonus_quantity: parseInt(it.bonus_quantity) || 0,
+          discount_percentage: parseFloat(it.discount_percentage) || 0,
+          applied_price_type: it.applied_price_type || 'mrp'
         }))
       };
       await api.post('/sales/bulk', payload);
@@ -344,8 +345,8 @@ export default function SalesPage() {
                 </div>
 
                 {/* Column headers */}
-                <div className="grid gap-2 text-xs font-semibold text-[#4A6D71] uppercase tracking-wide px-1" style={{ gridTemplateColumns: '2fr 1.2fr 0.7fr 0.7fr 0.7fr 1fr 1.5rem' }}>
-                  <span>Product</span><span>Batch</span><span>Qty</span><span>Free</span><span>Disc%</span><span className="text-right">Line Total</span><span />
+                <div className="grid gap-2 text-xs font-semibold text-[#4A6D71] uppercase tracking-wide px-1" style={{ gridTemplateColumns: '2fr 1fr 1.2fr 0.7fr 0.7fr 0.7fr 1fr 1.5rem' }}>
+                  <span>Product</span><span>Price Tier</span><span>Batch</span><span>Qty</span><span>Free</span><span>Disc%</span><span className="text-right">Line Total</span><span />
                 </div>
 
                 {order.items.map((item, idx) => {
@@ -353,16 +354,22 @@ export default function SalesPage() {
                   const filteredBatches = batches.filter(b => b.product_id == item.product_id && b.status === 'active');
                   return (
                     <div key={idx} className="border border-[#E1ECEB] rounded-xl p-3 bg-white space-y-2">
-                      <div className="grid gap-2 items-center" style={{ gridTemplateColumns: '2fr 1.2fr 0.7fr 0.7fr 0.7fr 1fr 1.5rem' }}>
+                      <div className="grid gap-2 items-center" style={{ gridTemplateColumns: '2fr 1fr 1.2fr 0.7fr 0.7fr 0.7fr 1fr 1.5rem' }}>
                         {/* Product */}
                         <select value={item.product_id} onChange={e => updateItem(idx, 'product_id', e.target.value)} className="select-field text-sm" required>
                           <option value="">Select product</option>
-                          {products.map(p => <option key={p.id} value={p.id}>{p.name} (₹{p.price})</option>)}
+                          {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
+                        {/* Price Type */}
+                        <select value={item.applied_price_type} onChange={e => updateItem(idx, 'applied_price_type', e.target.value)} className="select-field text-sm font-semibold" required>
+                          <option value="mrp">MRP</option>
+                          <option value="pts">PTS</option>
+                          <option value="prp">PRP</option>
                         </select>
                         {/* Batch */}
                         <select value={item.batch_id} onChange={e => updateItem(idx, 'batch_id', e.target.value)} className="select-field text-sm" disabled={!item.product_id || filteredBatches.length === 0}>
                           <option value="">No batch</option>
-                          {filteredBatches.map(b => <option key={b.id} value={b.id}>{b.batch_number} (₹{b.mrp})</option>)}
+                          {filteredBatches.map(b => <option key={b.id} value={b.id}>{b.batch_number}</option>)}
                         </select>
                         {/* Qty */}
                         <input type="number" min="1" value={item.quantity_sold} onChange={e => updateItem(idx, 'quantity_sold', e.target.value)} className="input-field text-sm text-center" placeholder="Qty" required />

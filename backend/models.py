@@ -60,7 +60,10 @@ class Product(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     category = Column(String)
-    price = Column(Float, nullable=False)
+    price = Column(Float, nullable=False)  # Legacy generic price
+    mrp = Column(Float, default=0.0)       # Maximum Retail Price
+    pts = Column(Float, default=0.0)       # Price to Stockist
+    prp = Column(Float, default=0.0)       # Price to Retailer/Purchaser
     generic_name = Column(String)
     composition = Column(String)
     dosage = Column(String)

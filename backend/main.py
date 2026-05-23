@@ -22,6 +22,10 @@ def run_migrations():
             "ALTER TABLE sales ADD COLUMN IF NOT EXISTS sale_order_id VARCHAR",
             # gst_rate stores the GST % applied to each sale line (default 5%)
             "ALTER TABLE sales ADD COLUMN IF NOT EXISTS gst_rate FLOAT DEFAULT 5.0",
+            # Product price tiers
+            "ALTER TABLE products ADD COLUMN IF NOT EXISTS mrp FLOAT DEFAULT 0.0",
+            "ALTER TABLE products ADD COLUMN IF NOT EXISTS pts FLOAT DEFAULT 0.0",
+            "ALTER TABLE products ADD COLUMN IF NOT EXISTS prp FLOAT DEFAULT 0.0",
         ]
         for sql in migrations:
             try:

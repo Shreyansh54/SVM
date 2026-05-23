@@ -118,7 +118,10 @@ class StockistOut(BaseModel):
 class ProductCreate(BaseModel):
     name: str
     category: Optional[str] = None
-    price: float
+    price: float = 0.0
+    mrp: float = 0.0
+    pts: float = 0.0
+    prp: float = 0.0
     generic_name: Optional[str] = None
     composition: Optional[str] = None
     dosage: Optional[str] = None
@@ -132,6 +135,9 @@ class ProductUpdate(BaseModel):
     name: Optional[str] = None
     category: Optional[str] = None
     price: Optional[float] = None
+    mrp: Optional[float] = None
+    pts: Optional[float] = None
+    prp: Optional[float] = None
     generic_name: Optional[str] = None
     composition: Optional[str] = None
     dosage: Optional[str] = None
@@ -146,6 +152,9 @@ class ProductOut(BaseModel):
     name: str
     category: Optional[str] = None
     price: float
+    mrp: float
+    pts: float
+    prp: float
     generic_name: Optional[str] = None
     composition: Optional[str] = None
     dosage: Optional[str] = None
@@ -247,6 +256,7 @@ class SaleCreate(BaseModel):
     quantity_sold: int
     bonus_quantity: int = 0
     discount_percentage: float = 0.0
+    applied_price_type: str = "mrp"  # "mrp", "pts", or "prp"
 
 
 class SaleOut(BaseModel):
@@ -284,6 +294,7 @@ class SaleLineItem(BaseModel):
     bonus_quantity: int = 0
     discount_percentage: float = 0.0
     gst_rate: float = 5.0  # default 5% GST
+    applied_price_type: str = "mrp"  # "mrp", "pts", or "prp"
 
 
 class BulkSaleCreate(BaseModel):
