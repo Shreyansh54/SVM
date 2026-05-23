@@ -272,15 +272,17 @@ export default function SalesPage() {
                 )}
               </div>
 
-              {/* Bonus Quantity - doctor sales only */}
-              {form.sale_type === 'doctor' && (
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1">Bonus Quantity <span className="text-xs text-gray-600">(free units)</span></label>
-                  <input type="number" min="0" value={form.bonus_quantity}
-                    onChange={e => setForm({...form, bonus_quantity: e.target.value})} className="input-field" placeholder="0" />
-                  <p className="text-xs text-gray-600 mt-1">💊 These units go for FREE to the doctor (not charged)</p>
-                </div>
-              )}
+              {/* Bonus Quantity - shown for both stockist and doctor sales */}
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Bonus / Free Goods Qty <span className="text-xs text-gray-600">(free units)</span></label>
+                <input type="number" min="0" value={form.bonus_quantity}
+                  onChange={e => setForm({...form, bonus_quantity: e.target.value})} className="input-field" placeholder="0" />
+                <p className="text-xs text-gray-600 mt-1">
+                  {form.sale_type === 'stockist'
+                    ? '🎁 Free goods given to the stockist (deducted from stock, not charged)'
+                    : '💊 Free units given to the doctor (not charged)'}
+                </p>
+              </div>
 
               {/* Price Preview */}
               {preview && (

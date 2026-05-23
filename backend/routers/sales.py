@@ -91,10 +91,10 @@ def create_sale(
         if sale.batch_id:
             stock_query = stock_query.filter(models.Stock.batch_id == sale.batch_id)
         stock = stock_query.first()
-        if not stock or stock.quantity < sale.quantity_sold:
-            raise HTTPException(status_code=400, detail="Insufficient stock at this stockist")
-        # Deduct stock for stockist sales
-        stock.quantity -= sale.quantity_sold
+        if not stock or stock.quantity < (sale.quantity_sold + (sale.bonus_quantity or 0)):
+            raise HTTPException(status_code=400, detail="Insufficient stock at this stockist (including free goods)")
+        # Deduct sold + bonus (free goods) quantity from stock
+        stock.quantity -= (sale.quantity_sold + (sale.bonus_quantity or 0))
 
     # Calculate price
     if sale.batch_id and batch:
@@ -111,8 +111,8 @@ def create_sale(
 
     total_amount = sale.quantity_sold * discounted_price
 
-    # Create sale
-    bonus = max(0, sale.bonus_quantity or 0) if sale_type == "doctor" else 0
+    # Allow bonus/free goods for both stockist and doctor sales
+    bonus = max(0, sale.bonus_quantity or 0)
     db_sale = models.Sale(
         employee_id=sale.employee_id,
         sale_type=sale_type,
