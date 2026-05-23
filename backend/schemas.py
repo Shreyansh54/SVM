@@ -35,7 +35,8 @@ class LoginRequest(BaseModel):
 
 
 class ForgotPasswordRequest(BaseModel):
-    username: str
+    username: Optional[str] = None
+    email: Optional[str] = None
 
 
 class ResetPasswordRequest(BaseModel):

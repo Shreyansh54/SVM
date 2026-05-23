@@ -27,7 +27,10 @@ export default function LoginPage() {
         toast.success('Welcome back!');
         navigate('/');
       } else if (mode === 'forgot') {
-        const res = await api.post('/forgot-password', { username });
+        const res = await api.post('/forgot-password', { 
+          username: username || null,
+          email: email || null
+        });
         toast.success(res.data.message || 'Password reset link sent to your registered email!');
         if (res.data.dev_link) console.log("Password Reset Link (Dev):", res.data.dev_link);
         setMode('login');
@@ -61,7 +64,7 @@ export default function LoginPage() {
           <div>
             <label className="block text-sm font-medium text-[#4A6D71] mb-1.5">Username</label>
             <input id="login-username" type="text" value={username} onChange={e => setUsername(e.target.value)}
-              className="input-field" placeholder="Enter username" required />
+              className="input-field" placeholder="Enter username" required={mode !== 'forgot'} />
           </div>
 
           {mode !== 'forgot' ? (
@@ -79,10 +82,17 @@ export default function LoginPage() {
                 className="input-field" placeholder="Enter password" required />
             </div>
           ) : (
-            <div className="bg-[#F0F6F6]/60 border border-[#E1ECEB] rounded-xl p-4 animate-fade-in">
-              <p className="text-xs text-[#4A6D71] leading-relaxed">
-                📧 A password reset link will be automatically sent to the email address registered with your employee profile.
-              </p>
+            <div className="space-y-3 animate-fade-in">
+              <div className="bg-[#F0F6F6]/60 border border-[#E1ECEB] rounded-xl p-3">
+                <p className="text-xs text-[#4A6D71] leading-relaxed">
+                  📧 Enter your <strong>username</strong> or <strong>registered email address</strong> to receive a password reset link.
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[#4A6D71] mb-1.5">Email Address (Registered)</label>
+                <input id="forgot-email" type="email" value={email} onChange={e => setEmail(e.target.value)}
+                  className="input-field" placeholder="e.g. sumedha.mishra123@gmail.com" />
+              </div>
             </div>
           )}
 

@@ -57,8 +57,11 @@ def login(req: schemas.LoginRequest, db: Session = Depends(get_db)):
     if not user or not verify_password(req.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    # For non-admin users, always verify they still exist in the employee list
-    if user.role != "admin" or user.employee_id is not None:
+    # Pure admin accounts (role=admin, no employee_id) bypass employee record check
+    if user.role == "admin" and user.employee_id is None:
+        role = "admin"
+    else:
+        # For all other users, verify they still exist in the employee list
         emp = None
 
         # Find employee by linked employee_id
@@ -70,24 +73,24 @@ def login(req: schemas.LoginRequest, db: Session = Depends(get_db)):
             emp = db.query(models.Employee).filter(models.Employee.name == user.username).first()
 
         if not emp:
-            # Employee was deleted — block login
-            raise HTTPException(
-                status_code=403,
-                detail="Your account has been removed. Please contact your administrator."
-            )
+            # Employee was deleted — block login for non-admin users only
+            if user.role != "admin":
+                raise HTTPException(
+                    status_code=403,
+                    detail="Your account has been removed. Please contact your administrator."
+                )
+            # If user is admin (but employee record was deleted), still allow login
+            role = user.role
+        else:
+            # Always use the role set by admin/HR in the employee profile
+            role = emp.role
 
-        # Always use the role set by admin/HR in the employee profile
-        role = emp.role
-
-        # Keep user account in sync
-        if user.role != role:
-            user.role = role
-        if user.employee_id != emp.id:
-            user.employee_id = emp.id
-        db.commit()
-    else:
-        # Pure admin account (like the default 'admin' account with no employee record)
-        role = user.role
+            # Keep user account in sync
+            if user.role != role:
+                user.role = role
+            if user.employee_id != emp.id:
+                user.employee_id = emp.id
+            db.commit()
 
     token = create_access_token(data={"sub": user.username, "role": role, "employee_id": user.employee_id})
     log_action(db, user.username, "USER_LOGIN", f"User logged in successfully (Role: {role})")
@@ -96,31 +99,55 @@ def login(req: schemas.LoginRequest, db: Session = Depends(get_db)):
 
 @router.post("/forgot-password")
 def forgot_password(req: schemas.ForgotPasswordRequest, db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.username == req.username).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="Username not found")
-        
-    # Automatically find the employee's registered email
-    email_to = None
-    
-    # 1. Check if linked via employee_id
-    if user.employee_id:
-        emp = db.query(models.Employee).filter(models.Employee.id == user.employee_id).first()
-        if emp and emp.email:
-            email_to = emp.email.strip().lower()
-    
-    # 2. Check if username matches employee name directly
-    if not email_to:
-        emp = db.query(models.Employee).filter(models.Employee.name == user.username).first()
-        if emp and emp.email:
-            email_to = emp.email.strip().lower()
+    if not req.username and not req.email:
+        raise HTTPException(status_code=400, detail="Please provide either a username or email address.")
 
-    # 3. Check if user has email stored directly on their account
-    if not email_to and hasattr(user, 'email') and user.email:
-        email_to = user.email.strip().lower()
-            
+    user = None
+    email_to = None
+
+    # Strategy 1: Lookup by username
+    if req.username:
+        user = db.query(models.User).filter(models.User.username == req.username).first()
+
+    # Strategy 2: If no username, or user not found, search by email via Employee table
+    if not user and req.email:
+        search_email = req.email.strip().lower()
+        emp = db.query(models.Employee).filter(
+            models.Employee.email.ilike(search_email)
+        ).first()
+        if emp:
+            # Find the linked user account
+            user = db.query(models.User).filter(
+                (models.User.employee_id == emp.id) |
+                (models.User.username == emp.name)
+            ).first()
+            if user:
+                email_to = emp.email.strip().lower()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="No account found with that username or email address.")
+
+    # Automatically find the employee's registered email (if not already found by email search)
+    if not email_to:
+        # 1. Check if linked via employee_id
+        if user.employee_id:
+            emp = db.query(models.Employee).filter(models.Employee.id == user.employee_id).first()
+            if emp and emp.email:
+                email_to = emp.email.strip().lower()
+
+        # 2. Check if username matches employee name directly
+        if not email_to:
+            emp = db.query(models.Employee).filter(models.Employee.name == user.username).first()
+            if emp and emp.email:
+                email_to = emp.email.strip().lower()
+
+        # 3. If email was provided in the request, use it directly as last resort
+        if not email_to and req.email:
+            email_to = req.email.strip().lower()
+
     if not email_to:
         raise HTTPException(status_code=400, detail="No email address found for this account. Please contact your administrator.")
+
         
     # Generate short-lived JWT token (15 mins)
     from datetime import timedelta
