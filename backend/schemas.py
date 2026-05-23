@@ -215,6 +215,10 @@ class StockUpdate(BaseModel):
     quantity: int
 
 
+class StockEdit(BaseModel):
+    quantity: int
+
+
 class StockOut(BaseModel):
     id: int
     stockist_id: int

@@ -117,3 +117,35 @@ def update_stock(
     db.commit()
     db.refresh(existing)
     return stock_to_out(existing)
+
+
+@router.put("/{stock_id}", response_model=schemas.StockOut)
+def edit_stock(
+    stock_id: int,
+    stock_edit: schemas.StockEdit,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role("admin"))
+):
+    stock = db.query(models.Stock).filter(models.Stock.id == stock_id).first()
+    if not stock:
+        raise HTTPException(status_code=404, detail="Stock not found")
+    
+    stock.quantity = stock_edit.quantity
+    db.commit()
+    db.refresh(stock)
+    return stock_to_out(stock)
+
+
+@router.delete("/{stock_id}")
+def delete_stock(
+    stock_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role("admin"))
+):
+    stock = db.query(models.Stock).filter(models.Stock.id == stock_id).first()
+    if not stock:
+        raise HTTPException(status_code=404, detail="Stock not found")
+    
+    db.delete(stock)
+    db.commit()
+    return {"message": "Stock deleted successfully"}
