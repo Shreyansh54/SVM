@@ -25,7 +25,8 @@ def run_migrations():
             # Product price tiers
             "ALTER TABLE products ADD COLUMN IF NOT EXISTS mrp FLOAT DEFAULT 0.0",
             "ALTER TABLE products ADD COLUMN IF NOT EXISTS pts FLOAT DEFAULT 0.0",
-            "ALTER TABLE products ADD COLUMN IF NOT EXISTS prp FLOAT DEFAULT 0.0",
+            "ALTER TABLE products ADD COLUMN IF NOT EXISTS ptr FLOAT DEFAULT 0.0",
+            "ALTER TABLE products RENAME COLUMN prp TO ptr",
         ]
         for sql in migrations:
             try:

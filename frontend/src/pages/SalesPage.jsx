@@ -364,7 +364,7 @@ export default function SalesPage() {
                         <select value={item.applied_price_type} onChange={e => updateItem(idx, 'applied_price_type', e.target.value)} className="select-field text-sm font-semibold" required>
                           <option value="mrp">MRP</option>
                           <option value="pts">PTS</option>
-                          <option value="prp">PRP</option>
+                          <option value="ptr">PTR</option>
                         </select>
                         {/* Batch */}
                         <select value={item.batch_id} onChange={e => updateItem(idx, 'batch_id', e.target.value)} className="select-field text-sm" disabled={!item.product_id || filteredBatches.length === 0}>

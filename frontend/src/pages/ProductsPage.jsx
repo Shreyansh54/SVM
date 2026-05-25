@@ -15,7 +15,7 @@ export default function ProductsPage() {
   const [filterCat, setFilterCat] = useState('');
   const [viewDetail, setViewDetail] = useState(null);
   const INITIAL_FORM = {
-    name: '', category: '', mrp: '', pts: '', prp: '', generic_name: '', 
+    name: '', category: '', mrp: '', pts: '', ptr: '', generic_name: '', 
     composition: '', dosage: '', packaging: '', manufacturer: '', schedule_type: '', hsn_code: ''
   };
   const [form, setForm] = useState(INITIAL_FORM);
@@ -36,7 +36,7 @@ export default function ProductsPage() {
       ...form, 
       mrp: parseFloat(form.mrp || 0), 
       pts: parseFloat(form.pts || 0), 
-      prp: parseFloat(form.prp || 0) 
+      ptr: parseFloat(form.ptr || 0) 
     };
     try {
       if (editing) { await api.put(`/products/${editing.id}`, data); toast.success('Medicine updated'); }
@@ -53,7 +53,7 @@ export default function ProductsPage() {
   const handleEdit = (p) => {
     setEditing(p);
     setForm({
-      name: p.name, category: p.category || '', mrp: p.mrp || '', pts: p.pts || '', prp: p.prp || '',
+      name: p.name, category: p.category || '', mrp: p.mrp || '', pts: p.pts || '', ptr: p.ptr || '',
       generic_name: p.generic_name || '', composition: p.composition || '',
       dosage: p.dosage || '', packaging: p.packaging || '', manufacturer: p.manufacturer || '', 
       schedule_type: p.schedule_type || '', hsn_code: p.hsn_code || ''
@@ -117,7 +117,7 @@ export default function ProductsPage() {
       </div>
 
       <div className="text-xs text-gray-600 bg-[#E3EFEF] rounded-lg px-4 py-2 border border-[#D5E5E4]">
-        💡 <strong>Excel format:</strong> Name, MRP, PTS, PRP, Category, Generic Name, Composition, Dosage, Packaging, Manufacturer, HSN Code, Schedule Type
+        💡 <strong>Excel format:</strong> Name, MRP, PTS, PTR, Category, Generic Name, Composition, Dosage, Packaging, Manufacturer, HSN Code, Schedule Type
       </div>
 
       <div className="flex gap-3 items-end flex-wrap">
@@ -146,7 +146,7 @@ export default function ProductsPage() {
               <th className="px-4 py-3 text-center">Schedule</th>
               <th className="px-4 py-3 text-right">MRP (₹)</th>
               <th className="px-4 py-3 text-right">PTS (₹)</th>
-              <th className="px-4 py-3 text-right">PRP (₹)</th>
+              <th className="px-4 py-3 text-right">PTR (₹)</th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr></thead>
             <tbody>
@@ -167,7 +167,7 @@ export default function ProductsPage() {
                   </td>
                   <td className="px-4 py-3 text-right font-medium text-[#1A3D40]">{p.mrp ? p.mrp.toFixed(2) : '—'}</td>
                   <td className="px-4 py-3 text-right font-medium text-[#1A3D40]">{p.pts ? p.pts.toFixed(2) : '—'}</td>
-                  <td className="px-4 py-3 text-right font-medium text-[#1A3D40]">{p.prp ? p.prp.toFixed(2) : '—'}</td>
+                  <td className="px-4 py-3 text-right font-medium text-[#1A3D40]">{p.ptr ? p.ptr.toFixed(2) : '—'}</td>
                   <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
                     <div className="flex justify-end gap-1">
                       <button onClick={() => handleEdit(p)} className="p-1.5 rounded-lg text-gray-400 hover:text-primary-400 hover:bg-primary-500/10 transition-all"><HiOutlinePencil className="w-4 h-4" /></button>
@@ -214,7 +214,7 @@ export default function ProductsPage() {
                 ['HSN Code', viewDetail.hsn_code],
                 ['MRP (₹)', viewDetail.mrp ? viewDetail.mrp.toFixed(2) : '—'],
                 ['PTS (₹)', viewDetail.pts ? viewDetail.pts.toFixed(2) : '—'],
-                ['PRP (₹)', viewDetail.prp ? viewDetail.prp.toFixed(2) : '—']
+                ['PTR (₹)', viewDetail.ptr ? viewDetail.ptr.toFixed(2) : '—']
               ].map(([label, value]) => value ? (
                 <div key={label} className="flex justify-between py-2 border-b border-gray-100">
                   <span className="text-sm text-gray-500">{label}</span>
@@ -295,8 +295,8 @@ export default function ProductsPage() {
                   <input type="number" step="0.01" min="0" value={form.pts} onChange={e => setForm({...form, pts: e.target.value})} className="input-field" required />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1">PRP (₹) <span className="text-xs text-gray-400">(Price to Retailer/Purchaser)</span> *</label>
-                  <input type="number" step="0.01" min="0" value={form.prp} onChange={e => setForm({...form, prp: e.target.value})} className="input-field" required />
+                  <label className="block text-sm text-gray-400 mb-1">PTR (₹) <span className="text-xs text-gray-400">(Price to Retailer)</span> *</label>
+                  <input type="number" step="0.01" min="0" value={form.ptr} onChange={e => setForm({...form, ptr: e.target.value})} className="input-field" required />
                 </div>
               </div>
               <div className="flex gap-3 pt-2">
