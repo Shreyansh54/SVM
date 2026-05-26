@@ -375,17 +375,6 @@ export default function SalesPage() {
                           <option value="ptr">PTR</option>
                           {order.sale_type === 'doctor' && <option value="manual">Manual</option>}
                         </select>
-                        {/* Manual Price input — only shown when Manual is selected */}
-                        {item.applied_price_type === 'manual' && (
-                          <input
-                            type="number" min="0" step="0.01"
-                            value={item.manual_price}
-                            onChange={e => updateItem(idx, 'manual_price', e.target.value)}
-                            className="input-field text-sm"
-                            placeholder="₹ Enter price"
-                            required
-                          />
-                        )}
                         {/* Batch */}
                         <select value={item.batch_id} onChange={e => updateItem(idx, 'batch_id', e.target.value)} className="select-field text-sm" disabled={!item.product_id || filteredBatches.length === 0}>
                           <option value="">No batch</option>
@@ -407,6 +396,24 @@ export default function SalesPage() {
                           <HiOutlineTrash className="w-4 h-4" />
                         </button>
                       </div>
+
+                      {/* Manual price row — shown below grid, never breaks column layout */}
+                      {item.applied_price_type === 'manual' && (
+                        <div className="flex items-center gap-3 px-1 pt-0.5">
+                          <label className="text-xs font-semibold text-[#4A6D71] whitespace-nowrap">💰 Manual Price (₹/unit)</label>
+                          <input
+                            type="number" min="0" step="0.01"
+                            value={item.manual_price}
+                            onChange={e => updateItem(idx, 'manual_price', e.target.value)}
+                            className="input-field text-sm w-40"
+                            placeholder="Enter price per unit"
+                            required
+                          />
+                          {item.manual_price && parseFloat(item.manual_price) > 0 && (
+                            <span className="text-xs text-[#14A89C] font-semibold">₹{parseFloat(item.manual_price).toFixed(2)}/unit</span>
+                          )}
+                        </div>
+                      )}
 
                       {/* Per-line mini preview */}
                       {prev && (
