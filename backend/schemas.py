@@ -256,7 +256,8 @@ class SaleCreate(BaseModel):
     quantity_sold: int
     bonus_quantity: int = 0
     discount_percentage: float = 0.0
-    applied_price_type: str = "mrp"  # "mrp", "pts", or "prp"
+    applied_price_type: str = "mrp"  # "mrp", "pts", "ptr", or "manual"
+    manual_price: Optional[float] = None  # Used when applied_price_type == "manual"
 
 
 class SaleOut(BaseModel):
@@ -294,7 +295,8 @@ class SaleLineItem(BaseModel):
     bonus_quantity: int = 0
     discount_percentage: float = 0.0
     gst_rate: float = 5.0  # default 5% GST
-    applied_price_type: str = "mrp"  # "mrp", "pts", or "ptr"
+    applied_price_type: str = "mrp"  # "mrp", "pts", "ptr", or "manual"
+    manual_price: Optional[float] = None  # Used when applied_price_type == "manual"
 
 
 class BulkSaleCreate(BaseModel):

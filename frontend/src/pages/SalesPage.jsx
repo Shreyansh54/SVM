@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import { HiOutlinePlus, HiOutlineDownload, HiOutlineX, HiOutlineTrash } from 'react-icons/hi';
 import { useAuth } from '../context/AuthContext';
 
-const BLANK_LINE = { product_id: '', batch_id: '', quantity_sold: '', bonus_quantity: '0', discount_percentage: '0', applied_price_type: 'mrp' };
+const BLANK_LINE = { product_id: '', batch_id: '', quantity_sold: '', bonus_quantity: '0', discount_percentage: '0', applied_price_type: 'mrp', manual_price: '' };
 
 const BLANK_ORDER = {
   employee_id: '', sale_type: 'stockist', stockist_id: '', doctor_id: '',
@@ -73,10 +73,16 @@ export default function SalesPage() {
     if (!item.product_id || !item.quantity_sold) return null;
     const product = products.find(p => p.id == item.product_id);
     if (!product) return null;
-    let unitPrice = product[item.applied_price_type] || product.price; // fallback to generic price if tier is 0
-    if (item.applied_price_type === 'mrp' && item.batch_id) {
-      const b = batches.find(b => b.id == item.batch_id);
-      if (b && b.mrp) unitPrice = b.mrp;
+    let unitPrice;
+    if (item.applied_price_type === 'manual') {
+      unitPrice = parseFloat(item.manual_price || 0);
+      if (!unitPrice) return null; // Can't preview without a manual price
+    } else {
+      unitPrice = product[item.applied_price_type] || product.price; // fallback to generic price if tier is 0
+      if (item.applied_price_type === 'mrp' && item.batch_id) {
+        const b = batches.find(b => b.id == item.batch_id);
+        if (b && b.mrp) unitPrice = b.mrp;
+      }
     }
     const discount = parseFloat(item.discount_percentage || 0);
     const discountedPrice = unitPrice * (1 - discount / 100);
@@ -111,6 +117,7 @@ export default function SalesPage() {
       const it = order.items[i];
       if (!it.product_id) { toast.error(`Line ${i + 1}: Select a product.`); return; }
       if (!it.quantity_sold || parseInt(it.quantity_sold) <= 0) { toast.error(`Line ${i + 1}: Enter a valid quantity.`); return; }
+      if (it.applied_price_type === 'manual' && (!it.manual_price || parseFloat(it.manual_price) <= 0)) { toast.error(`Line ${i + 1}: Enter a valid manual price.`); return; }
     }
 
     setSubmitting(true);
@@ -126,7 +133,8 @@ export default function SalesPage() {
           quantity_sold: parseInt(it.quantity_sold),
           bonus_quantity: parseInt(it.bonus_quantity) || 0,
           discount_percentage: parseFloat(it.discount_percentage) || 0,
-          applied_price_type: it.applied_price_type || 'mrp'
+          applied_price_type: it.applied_price_type || 'mrp',
+          manual_price: it.applied_price_type === 'manual' ? parseFloat(it.manual_price) : null
         }))
       };
       await api.post('/sales/bulk', payload);
@@ -365,7 +373,19 @@ export default function SalesPage() {
                           <option value="mrp">MRP</option>
                           <option value="pts">PTS</option>
                           <option value="ptr">PTR</option>
+                          {order.sale_type === 'doctor' && <option value="manual">Manual</option>}
                         </select>
+                        {/* Manual Price input — only shown when Manual is selected */}
+                        {item.applied_price_type === 'manual' && (
+                          <input
+                            type="number" min="0" step="0.01"
+                            value={item.manual_price}
+                            onChange={e => updateItem(idx, 'manual_price', e.target.value)}
+                            className="input-field text-sm"
+                            placeholder="₹ Enter price"
+                            required
+                          />
+                        )}
                         {/* Batch */}
                         <select value={item.batch_id} onChange={e => updateItem(idx, 'batch_id', e.target.value)} className="select-field text-sm" disabled={!item.product_id || filteredBatches.length === 0}>
                           <option value="">No batch</option>

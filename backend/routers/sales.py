@@ -101,7 +101,9 @@ def create_sale(
 
     # Calculate price based on selected price tier
     price_type = sale.applied_price_type or "mrp"
-    if price_type == "mrp" and sale.batch_id and batch:
+    if price_type == "manual" and sale.manual_price is not None:
+        unit_price = sale.manual_price
+    elif price_type == "mrp" and sale.batch_id and batch:
         unit_price = batch.mrp
     else:
         unit_price = getattr(product, price_type, product.price)
@@ -228,7 +230,9 @@ def create_bulk_sale(
 
         # Price calculation based on selected price tier
         price_type = item.applied_price_type or "mrp"
-        if price_type == "mrp" and batch:
+        if price_type == "manual" and item.manual_price is not None:
+            unit_price = item.manual_price
+        elif price_type == "mrp" and batch:
             unit_price = batch.mrp
         else:
             unit_price = getattr(product, price_type, product.price)
