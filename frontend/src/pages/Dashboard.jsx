@@ -70,12 +70,36 @@ export default function Dashboard() {
   }
 
   const statCards = isAdmin ? [
-    { label: 'Total Employees', value: summary?.total_employees || 0, icon: HiOutlineUserGroup, color: 'from-[#0A373A] to-[#14A89C]', bg: 'bg-[#0A373A]/10' },
-    { label: 'Total Medicines', value: summary?.total_products || 0, icon: HiOutlineCube, color: 'from-[#14A89C] to-teal-600', bg: 'bg-[#14A89C]/10' },
-    { label: 'Total Sales', value: `₹${(summary?.total_sales_amount || 0).toLocaleString()}`, icon: HiOutlineCurrencyDollar, color: 'from-emerald-600 to-teal-600', bg: 'bg-emerald-500/10' },
-    { label: 'Sales Count', value: summary?.total_sales_count || 0, icon: HiOutlineShoppingCart, color: 'from-amber-600 to-orange-500', bg: 'bg-amber-500/10' },
-    { label: 'Stockists', value: summary?.total_stockists || 0, icon: HiOutlineTrendingUp, color: 'from-[#14A89C] to-emerald-500', bg: 'bg-[#14A89C]/10' },
-    { label: 'Low Stock', value: summary?.low_stock_count || 0, icon: HiOutlineExclamation, color: 'from-red-600 to-rose-500', bg: 'bg-red-500/10' },
+    {
+      label: 'Total Employees', value: summary?.total_employees || 0,
+      icon: HiOutlineUserGroup, iconColor: '#0A373A', bg: 'bg-[#0A373A]/10',
+      accent: 'from-[#0A373A] to-[#14A89C]', desc: 'Active team members'
+    },
+    {
+      label: 'Total Medicines', value: summary?.total_products || 0,
+      icon: HiOutlineCube, iconColor: '#14A89C', bg: 'bg-[#14A89C]/10',
+      accent: 'from-[#14A89C] to-teal-400', desc: 'Products in catalogue'
+    },
+    {
+      label: 'Total Sales', value: `₹${(summary?.total_sales_amount || 0).toLocaleString()}`,
+      icon: HiOutlineCurrencyDollar, iconColor: '#059669', bg: 'bg-emerald-500/10',
+      accent: 'from-emerald-500 to-teal-500', desc: 'Revenue this period'
+    },
+    {
+      label: 'Sales Count', value: summary?.total_sales_count || 0,
+      icon: HiOutlineShoppingCart, iconColor: '#d97706', bg: 'bg-amber-500/10',
+      accent: 'from-amber-400 to-orange-400', desc: 'Orders recorded'
+    },
+    {
+      label: 'Stockists', value: summary?.total_stockists || 0,
+      icon: HiOutlineTrendingUp, iconColor: '#0891b2', bg: 'bg-cyan-500/10',
+      accent: 'from-cyan-500 to-[#14A89C]', desc: 'Active distributors'
+    },
+    {
+      label: 'Low Stock', value: summary?.low_stock_count || 0,
+      icon: HiOutlineExclamation, iconColor: '#dc2626', bg: 'bg-red-500/10',
+      accent: 'from-red-500 to-rose-400', desc: 'Items need restock'
+    },
   ] : [];
 
   const salesChartData = {
@@ -183,18 +207,27 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Stat Cards */}
       {isAdmin && statCards.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-          {statCards.map((card, i) => (
-            <div key={i} className="stat-card" style={{ animationDelay: `${i * 60}ms` }}>
-              <div className={`w-10 h-10 rounded-xl ${card.bg} flex items-center justify-center`}>
-                <card.icon className={`w-5 h-5 bg-gradient-to-r ${card.color} bg-clip-text`} style={{ color: 'transparent', WebkitBackgroundClip: 'text', backgroundImage: `linear-gradient(to right, var(--tw-gradient-stops))` }} />
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4">
+          {statCards.map((card, i) => {
+            const Icon = card.icon;
+            return (
+              <div key={i} className="bg-white border border-[#E1ECEB] rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-200 flex flex-col gap-3 relative overflow-hidden">
+                {/* top accent bar */}
+                <div className={`absolute top-0 left-0 right-0 h-1 rounded-t-2xl bg-gradient-to-r ${card.accent}`} />
+                {/* icon badge */}
+                <div className={`w-11 h-11 rounded-xl ${card.bg} flex items-center justify-center flex-shrink-0`}>
+                  <Icon className="w-6 h-6" style={{ color: card.iconColor }} />
+                </div>
+                {/* value */}
+                <div>
+                  <p className="text-2xl font-extrabold text-[#0A373A] leading-none">{card.value}</p>
+                  <p className="text-xs font-semibold text-[#4A6D71] mt-1">{card.label}</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">{card.desc}</p>
+                </div>
               </div>
-              <p className="text-2xl font-bold text-[#1A3D40] mt-1">{card.value}</p>
-              <p className="text-xs text-[#5B7F83]">{card.label}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
