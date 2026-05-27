@@ -123,6 +123,7 @@ def get_collections(
     collection_type: Optional[str] = Query(None, description="Filter: 'stockist' or 'doctor'"),
     stockist_id: Optional[int] = Query(None),
     doctor_id: Optional[int] = Query(None),
+    employee_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_role("admin", "manager", "hr"))
 ):
@@ -138,6 +139,8 @@ def get_collections(
         query = query.filter(models.Collection.stockist_id == stockist_id)
     if doctor_id:
         query = query.filter(models.Collection.doctor_id == doctor_id)
+    if employee_id:
+        query = query.filter(models.Collection.employee_id == employee_id)
         
     cols = query.order_by(models.Collection.date.desc()).all()
     for c in cols:
