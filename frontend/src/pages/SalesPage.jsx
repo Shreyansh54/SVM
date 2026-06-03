@@ -352,8 +352,8 @@ export default function SalesPage() {
                   <span className="text-xs text-[#14A89C] font-semibold bg-[#E3EFEF] px-2 py-0.5 rounded-full">{order.items.length} item(s)</span>
                 </div>
 
-                {/* Column headers */}
-                <div className="grid gap-2 text-xs font-semibold text-[#4A6D71] uppercase tracking-wide px-1" style={{ gridTemplateColumns: '2fr 1fr 1.2fr 0.7fr 0.7fr 0.7fr 1fr 1.5rem' }}>
+                {/* Column headers (hidden on mobile, grid on desktop) */}
+                <div className="hidden sm:grid gap-2 text-xs font-semibold text-[#4A6D71] uppercase tracking-wide px-1" style={{ gridTemplateColumns: '2fr 1fr 1.2fr 0.7fr 0.7fr 0.7fr 1fr 1.5rem' }}>
                   <span>Product</span><span>Price Tier</span><span>Batch</span><span>Qty</span><span>Free</span><span>Disc%</span><span className="text-right">Line Total</span><span />
                 </div>
 
@@ -362,7 +362,9 @@ export default function SalesPage() {
                   const filteredBatches = batches.filter(b => b.product_id == item.product_id && b.status === 'active');
                   return (
                     <div key={idx} className="border border-[#E1ECEB] rounded-xl p-3 bg-white space-y-2">
-                      <div className="grid gap-2 items-center" style={{ gridTemplateColumns: '2fr 1fr 1.2fr 0.7fr 0.7fr 0.7fr 1fr 1.5rem' }}>
+                      
+                      {/* Desktop layout: visible only on sm screens and up */}
+                      <div className="hidden sm:grid gap-2 items-center" style={{ gridTemplateColumns: '2fr 1fr 1.2fr 0.7fr 0.7fr 0.7fr 1fr 1.5rem' }}>
                         {/* Product */}
                         <select value={item.product_id} onChange={e => updateItem(idx, 'product_id', e.target.value)} className="select-field text-sm" required>
                           <option value="">Select product</option>
@@ -395,6 +397,68 @@ export default function SalesPage() {
                           className="text-gray-300 hover:text-red-500 disabled:opacity-20 disabled:cursor-not-allowed transition-colors">
                           <HiOutlineTrash className="w-4 h-4" />
                         </button>
+                      </div>
+
+                      {/* Mobile layout: visible only on screens smaller than sm */}
+                      <div className="flex flex-col gap-3 sm:hidden">
+                        {/* Row 1: Product Selection */}
+                        <div>
+                          <label className="block text-[10px] font-bold text-[#4A6D71] uppercase tracking-wider mb-1">Product *</label>
+                          <select value={item.product_id} onChange={e => updateItem(idx, 'product_id', e.target.value)} className="select-field text-sm" required>
+                            <option value="">Select product</option>
+                            {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                          </select>
+                        </div>
+
+                        {/* Row 2: Price Tier & Batch */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[10px] font-bold text-[#4A6D71] uppercase tracking-wider mb-1">Price Tier *</label>
+                            <select value={item.applied_price_type} onChange={e => updateItem(idx, 'applied_price_type', e.target.value)} className="select-field text-sm font-semibold" required>
+                              <option value="mrp">MRP</option>
+                              <option value="pts">PTS</option>
+                              <option value="ptr">PTR</option>
+                              {order.sale_type === 'doctor' && <option value="manual">Manual</option>}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-[#4A6D71] uppercase tracking-wider mb-1">Batch</label>
+                            <select value={item.batch_id} onChange={e => updateItem(idx, 'batch_id', e.target.value)} className="select-field text-sm" disabled={!item.product_id || filteredBatches.length === 0}>
+                              <option value="">No batch</option>
+                              {filteredBatches.map(b => <option key={b.id} value={b.id}>{b.batch_number}</option>)}
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Row 3: Qty, Free, Disc% */}
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="block text-[10px] font-bold text-[#4A6D71] uppercase tracking-wider mb-1">Qty *</label>
+                            <input type="number" min="1" value={item.quantity_sold} onChange={e => updateItem(idx, 'quantity_sold', e.target.value)} className="input-field text-sm text-center" placeholder="Qty" required />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-[#4A6D71] uppercase tracking-wider mb-1">Free</label>
+                            <input type="number" min="0" value={item.bonus_quantity} onChange={e => updateItem(idx, 'bonus_quantity', e.target.value)} className="input-field text-sm text-center" placeholder="0" />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-[#4A6D71] uppercase tracking-wider mb-1">Disc%</label>
+                            <input type="number" min="0" max="100" step="0.5" value={item.discount_percentage} onChange={e => updateItem(idx, 'discount_percentage', e.target.value)} className="input-field text-sm text-center" placeholder="0" />
+                          </div>
+                        </div>
+
+                        {/* Row 4: Line Total & Remove button */}
+                        <div className="flex items-center justify-between border-t border-[#E1ECEB] pt-2">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs text-[#4A6D71] font-semibold">Line Total:</span>
+                            <span className="text-sm font-bold text-emerald-600">
+                              {prev ? `₹${prev.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                            </span>
+                          </div>
+                          <button type="button" onClick={() => removeLine(idx)} disabled={order.items.length === 1}
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-red-100 text-red-500 hover:bg-red-50 disabled:opacity-20 disabled:cursor-not-allowed transition-colors text-xs font-bold">
+                            <HiOutlineTrash className="w-3.5 h-3.5" /> Remove
+                          </button>
+                        </div>
                       </div>
 
                       {/* Manual price row — shown below grid, never breaks column layout */}
