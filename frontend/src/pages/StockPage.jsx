@@ -1,6 +1,16 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import api from '../api';
+
+const parseUTCDateTime = (timestamp) => {
+  if (!timestamp) return null;
+  let dateStr = timestamp;
+  if (typeof dateStr === 'string' && !dateStr.includes('Z') && !/\+\d{2}:?\d{2}$/.test(dateStr) && !/-\d{2}:?\d{2}$/.test(dateStr)) {
+    dateStr = dateStr + 'Z';
+  }
+  return new Date(dateStr);
+};
+
 import toast from 'react-hot-toast';
 import { HiOutlinePlus, HiOutlineX, HiOutlinePencil, HiOutlineTrash } from 'react-icons/hi';
 import { useAuth } from '../context/AuthContext';
@@ -138,7 +148,7 @@ export default function StockPage() {
                   s.quantity < 100 ? 'bg-red-500' : s.quantity < 500 ? 'bg-amber-500' : 'bg-emerald-500'
                 }`} style={{ width: `${Math.min(100, (s.quantity / 1000) * 100)}%` }} />
               </div>
-              {s.last_updated && <p className="text-xs text-gray-600 mt-2">Updated: {new Date(s.last_updated).toLocaleDateString()}</p>}
+              {s.last_updated && <p className="text-xs text-gray-600 mt-2">Updated: {parseUTCDateTime(s.last_updated)?.toLocaleDateString()}</p>}
             </div>
           ))}
           {stocks.length === 0 && <div className="col-span-full text-center py-12 text-gray-500">No stock entries</div>}

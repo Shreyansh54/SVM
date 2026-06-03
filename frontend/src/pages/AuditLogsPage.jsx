@@ -1,5 +1,15 @@
 import { useState, useEffect } from 'react';
 import api from '../api';
+
+const parseUTCDateTime = (timestamp) => {
+  if (!timestamp) return null;
+  let dateStr = timestamp;
+  if (typeof dateStr === 'string' && !dateStr.includes('Z') && !/\+\d{2}:?\d{2}$/.test(dateStr) && !/-\d{2}:?\d{2}$/.test(dateStr)) {
+    dateStr = dateStr + 'Z';
+  }
+  return new Date(dateStr);
+};
+
 import toast from 'react-hot-toast';
 import { HiOutlineSearch, HiOutlineDocumentText, HiOutlineFilter, HiOutlineRefresh } from 'react-icons/hi';
 
@@ -122,7 +132,7 @@ export default function AuditLogsPage() {
                 {filteredLogs.map((log, index) => (
                   <tr key={log.id} className={index % 2 === 1 ? 'bg-[#F0F6F6]/20' : 'bg-white'}>
                     <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-[#4A6D71]">
-                      {new Date(log.timestamp).toLocaleString()}
+                      {parseUTCDateTime(log.timestamp)?.toLocaleString() || '—'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-[#1A3D40]">
                       {log.username}
