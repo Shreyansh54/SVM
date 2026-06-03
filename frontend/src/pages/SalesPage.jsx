@@ -26,6 +26,8 @@ export default function SalesPage() {
   const [order, setOrder] = useState(BLANK_ORDER);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [doctorSearch, setDoctorSearch] = useState('');
+  const [showDoctorDropdown, setShowDoctorDropdown] = useState(false);
 
   useEffect(() => { load(); }, []);
 
@@ -170,7 +172,7 @@ export default function SalesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div><h1 className="page-title">Sales</h1><p className="text-sm text-gray-500 mt-1">{sales.length} total line items</p></div>
-        <button onClick={() => { setOrder(BLANK_ORDER); setShowModal(true); }} className="btn-primary flex items-center gap-2">
+        <button onClick={() => { setOrder(BLANK_ORDER); setDoctorSearch(''); setShowModal(true); }} className="btn-primary flex items-center gap-2">
           <HiOutlinePlus className="w-4 h-4" /> New Order
         </button>
       </div>
@@ -316,12 +318,18 @@ export default function SalesPage() {
                     <label className="block text-xs text-[#4A6D71] font-semibold mb-1">Sale Channel *</label>
                     <div className="flex gap-2">
                       <button type="button"
-                        onClick={() => setOrder(o => ({ ...o, sale_type: 'stockist', doctor_id: '' }))}
+                        onClick={() => {
+                          setOrder(o => ({ ...o, sale_type: 'stockist', doctor_id: '' }));
+                          setDoctorSearch('');
+                        }}
                         className={`flex-1 py-2 rounded-lg text-xs font-bold border transition-all ${order.sale_type === 'stockist' ? 'bg-blue-500/20 text-blue-600 border-blue-500/40' : 'bg-white text-[#4A6D71] border-[#D5E5E4]'}`}>
                         🏪 Stockist
                       </button>
                       <button type="button"
-                        onClick={() => setOrder(o => ({ ...o, sale_type: 'doctor', stockist_id: '' }))}
+                        onClick={() => {
+                          setOrder(o => ({ ...o, sale_type: 'doctor', stockist_id: '' }));
+                          setDoctorSearch('');
+                        }}
                         className={`flex-1 py-2 rounded-lg text-xs font-bold border transition-all ${order.sale_type === 'doctor' ? 'bg-purple-500/20 text-purple-600 border-purple-500/40' : 'bg-white text-[#4A6D71] border-[#D5E5E4]'}`}>
                         👨‍⚕️ Doctor
                       </button>
@@ -329,17 +337,93 @@ export default function SalesPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs text-[#4A6D71] font-semibold mb-1">{order.sale_type === 'stockist' ? 'Stockist' : 'Doctor'} *</label>
+                    <label className="block text-xs text-[#4A6D71] font-semibold mb-1">{order.sale_type === 'stockist' ? 'Stockist *' : 'Doctor *'}</label>
                     {order.sale_type === 'stockist' ? (
                       <select value={order.stockist_id} onChange={e => setOrder(o => ({ ...o, stockist_id: e.target.value }))} className="select-field text-sm" required>
                         <option value="">Select stockist</option>
                         {stockists.map(s => <option key={s.id} value={s.id}>{s.name}{s.location ? ` (${s.location})` : ''}</option>)}
                       </select>
                     ) : (
-                      <select value={order.doctor_id} onChange={e => setOrder(o => ({ ...o, doctor_id: e.target.value }))} className="select-field text-sm" required>
-                        <option value="">Select doctor</option>
-                        {doctors.map(d => <option key={d.id} value={d.id}>Dr. {d.name}{d.specialization ? ` — ${d.specialization}` : ''}</option>)}
-                      </select>
+                      <div className="relative">
+                        <input 
+                          type="text" 
+                          placeholder="Type to search doctor..." 
+                          value={doctorSearch}
+                          onFocus={() => setShowDoctorDropdown(true)}
+                          onChange={e => {
+                            setDoctorSearch(e.target.value);
+                            setShowDoctorDropdown(true);
+                            if (!e.target.value) {
+                              setOrder(o => ({ ...o, doctor_id: '' }));
+                            }
+                          }}
+                          className="input-field pr-10 text-sm"
+                          required={!order.doctor_id}
+                        />
+                        
+                        {doctorSearch && (
+                          <button 
+                            type="button" 
+                            onClick={() => {
+                              setOrder(o => ({ ...o, doctor_id: '' }));
+                              setDoctorSearch('');
+                              setShowDoctorDropdown(true);
+                            }}
+                            className="absolute right-8 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs animate-fade-in"
+                          >
+                            ✕
+                          </button>
+                        )}
+
+                        <button 
+                          type="button" 
+                          onClick={() => setShowDoctorDropdown(!showDoctorDropdown)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#4A6D71] hover:text-[#0A373A] text-xs"
+                        >
+                          {showDoctorDropdown ? '▲' : '▼'}
+                        </button>
+
+                        {showDoctorDropdown && (
+                          <>
+                            <div 
+                              className="fixed inset-0 z-40 bg-transparent" 
+                              onClick={() => {
+                                setShowDoctorDropdown(false);
+                                const currentDoc = doctors.find(d => d.id == order.doctor_id);
+                                setDoctorSearch(currentDoc ? `Dr. ${currentDoc.name}` : '');
+                              }}
+                            />
+                            
+                            <div className="absolute z-50 left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-white border border-[#E1ECEB] rounded-xl shadow-xl divide-y divide-[#E1ECEB]">
+                              {(() => {
+                                const filtered = doctors.filter(d => 
+                                  d.name.toLowerCase().includes(doctorSearch.toLowerCase()) ||
+                                  (d.specialization && d.specialization.toLowerCase().includes(doctorSearch.toLowerCase())) ||
+                                  (d.hospital && d.hospital.toLowerCase().includes(doctorSearch.toLowerCase()))
+                                );
+                                if (filtered.length === 0) {
+                                  return <div className="p-3 text-sm text-gray-500 text-center">No doctors found</div>;
+                                }
+                                return filtered.map(d => (
+                                  <button 
+                                    key={d.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setOrder(o => ({ ...o, doctor_id: d.id.toString() }));
+                                      setDoctorSearch(`Dr. ${d.name}`);
+                                      setShowDoctorDropdown(false);
+                                    }}
+                                    className={`w-full text-left px-4 py-2.5 text-sm hover:bg-[#F0F6F6] transition-colors ${order.doctor_id == d.id ? 'bg-[#E3EFEF] text-[#0A373A] font-semibold' : 'text-[#1A3D40]'}`}
+                                  >
+                                    <div className="font-medium">Dr. {d.name}</div>
+                                    <div className="text-[10px] text-gray-500 mt-0.5">{d.specialization || 'Clinic'}{d.hospital ? ` — ${d.hospital}` : ''}</div>
+                                  </button>
+                                ));
+                              })()}
+                            </div>
+                          </>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>

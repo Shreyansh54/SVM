@@ -21,6 +21,8 @@ export default function CollectionsPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [doctorSearch, setDoctorSearch] = useState('');
+  const [showDoctorDropdown, setShowDoctorDropdown] = useState(false);
 
   // Month & Year Filter state (default to current month/year)
   const today = new Date();
@@ -131,6 +133,7 @@ export default function CollectionsPage() {
       date: today.toISOString().split('T')[0],
       remarks: ''
     });
+    setDoctorSearch('');
   };
 
   const handleEdit = (c) => {
@@ -145,6 +148,12 @@ export default function CollectionsPage() {
       date: c.date,
       remarks: c.remarks || ''
     });
+    if (c.doctor_id) {
+      const doc = doctors.find(d => d.id == c.doctor_id);
+      setDoctorSearch(doc ? doc.name : '');
+    } else {
+      setDoctorSearch('');
+    }
     setShowModal(true);
   };
 
@@ -369,14 +378,20 @@ export default function CollectionsPage() {
                 <div className="grid grid-cols-2 gap-2">
                   <button 
                     type="button"
-                    onClick={() => setForm({ ...form, collection_type: 'stockist', stockist_id: '', doctor_id: '' })}
+                    onClick={() => {
+                      setForm({ ...form, collection_type: 'stockist', stockist_id: '', doctor_id: '' });
+                      setDoctorSearch('');
+                    }}
                     className={`py-2 text-sm font-semibold rounded-lg border transition-colors ${form.collection_type === 'stockist' ? 'bg-[#0A373A] border-[#0A373A] text-white' : 'bg-white border-[#C6DAD8] text-[#4A6D71] hover:bg-[#F0F6F6]'}`}
                   >
                     Stockist Payment
                   </button>
                   <button 
                     type="button"
-                    onClick={() => setForm({ ...form, collection_type: 'doctor', stockist_id: '', doctor_id: '' })}
+                    onClick={() => {
+                      setForm({ ...form, collection_type: 'doctor', stockist_id: '', doctor_id: '' });
+                      setDoctorSearch('');
+                    }}
                     className={`py-2 text-sm font-semibold rounded-lg border transition-colors ${form.collection_type === 'doctor' ? 'bg-[#14A89C] border-[#14A89C] text-white' : 'bg-white border-[#C6DAD8] text-[#4A6D71] hover:bg-[#F0F6F6]'}`}
                   >
                     Doctor Payment
@@ -400,16 +415,87 @@ export default function CollectionsPage() {
                 </div>
               ) : (
                 <div>
-                  <label className="block text-sm text-[#4A6D71] font-semibold mb-1">Select Doctor</label>
-                  <select 
-                    value={form.doctor_id} 
-                    onChange={e => setForm({ ...form, doctor_id: e.target.value })}
-                    className="input-field"
-                    required
-                  >
-                    <option value="">-- Choose Doctor --</option>
-                    {doctors.map(d => <option key={d.id} value={d.id}>{d.name} ({d.specialization || 'Clinic'})</option>)}
-                  </select>
+                  <label className="block text-sm text-[#4A6D71] font-semibold mb-1">Select Doctor *</label>
+                  <div className="relative">
+                    <input 
+                      type="text" 
+                      placeholder="Type to search doctor..." 
+                      value={doctorSearch}
+                      onFocus={() => setShowDoctorDropdown(true)}
+                      onChange={e => {
+                        setDoctorSearch(e.target.value);
+                        setShowDoctorDropdown(true);
+                        if (!e.target.value) {
+                          setForm(f => ({ ...f, doctor_id: '' }));
+                        }
+                      }}
+                      className="input-field pr-10 text-sm"
+                      required={!form.doctor_id}
+                    />
+                    
+                    {doctorSearch && (
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          setForm(f => ({ ...f, doctor_id: '' }));
+                          setDoctorSearch('');
+                          setShowDoctorDropdown(true);
+                        }}
+                        className="absolute right-8 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs animate-fade-in"
+                      >
+                        ✕
+                      </button>
+                    )}
+
+                    <button 
+                      type="button" 
+                      onClick={() => setShowDoctorDropdown(!showDoctorDropdown)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#4A6D71] hover:text-[#0A373A] text-xs"
+                    >
+                      {showDoctorDropdown ? '▲' : '▼'}
+                    </button>
+
+                    {showDoctorDropdown && (
+                      <>
+                        <div 
+                          className="fixed inset-0 z-40 bg-transparent" 
+                          onClick={() => {
+                            setShowDoctorDropdown(false);
+                            const currentDoc = doctors.find(d => d.id == form.doctor_id);
+                            setDoctorSearch(currentDoc ? currentDoc.name : '');
+                          }}
+                        />
+                        
+                        <div className="absolute z-50 left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-white border border-[#E1ECEB] rounded-xl shadow-xl divide-y divide-[#E1ECEB]">
+                          {(() => {
+                            const filtered = doctors.filter(d => 
+                              d.name.toLowerCase().includes(doctorSearch.toLowerCase()) ||
+                              (d.specialization && d.specialization.toLowerCase().includes(doctorSearch.toLowerCase())) ||
+                              (d.hospital && d.hospital.toLowerCase().includes(doctorSearch.toLowerCase()))
+                            );
+                            if (filtered.length === 0) {
+                              return <div className="p-3 text-sm text-gray-500 text-center">No doctors found</div>;
+                            }
+                            return filtered.map(d => (
+                              <button 
+                                key={d.id}
+                                type="button"
+                                onClick={() => {
+                                  setForm(f => ({ ...f, doctor_id: d.id.toString() }));
+                                  setDoctorSearch(d.name);
+                                  setShowDoctorDropdown(false);
+                                }}
+                                className={`w-full text-left px-4 py-2.5 text-sm hover:bg-[#F0F6F6] transition-colors ${form.doctor_id == d.id ? 'bg-[#E3EFEF] text-[#0A373A] font-semibold' : 'text-[#1A3D40]'}`}
+                              >
+                                <div className="font-medium">{d.name}</div>
+                                <div className="text-[10px] text-gray-500 mt-0.5">{d.specialization || 'Clinic'}{d.hospital ? ` — ${d.hospital}` : ''}</div>
+                              </button>
+                            ));
+                          })()}
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
               )}
 
