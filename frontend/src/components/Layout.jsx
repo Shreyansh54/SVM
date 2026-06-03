@@ -21,7 +21,7 @@ const allNavItems = [
   { path: '/stock', label: 'Stock', icon: HiOutlineClipboardList, roles: ['admin'] },
   { path: '/attendance', label: 'Attendance', icon: HiOutlineCalendar, roles: ['admin', 'manager', 'employee', 'hr'] },
   { path: '/salary', label: 'Salary', icon: HiOutlineCurrencyDollar, roles: ['admin', 'hr'] },
-  { path: '/collections', label: 'Collections', icon: HiOutlineCollection, roles: ['admin', 'manager', 'hr'] },
+  { path: '/collections', label: 'Collections', icon: HiOutlineCollection, roles: ['admin', 'manager', 'hr', 'employee'] },
   { path: '/reports', label: 'Reports', icon: HiOutlineChartBar, roles: ['admin', 'manager', 'hr'] },
   { path: '/audit-logs', label: 'Audit Logs', icon: HiOutlineShieldCheck, roles: ['admin'] },
 ];

@@ -93,9 +93,13 @@ class CollectionsReportPDF(FPDF):
 def create_collection(
     col: schemas.CollectionCreate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role("admin", "manager"))
+    current_user: models.User = Depends(require_role("admin", "manager", "employee"))
 ):
-    db_col = models.Collection(**col.model_dump())
+    col_data = col.model_dump()
+    # Employees automatically record under their own name
+    if current_user.role == "employee" and current_user.employee_id:
+        col_data["employee_id"] = current_user.employee_id
+    db_col = models.Collection(**col_data)
     db.add(db_col)
     db.commit()
     db.refresh(db_col)
@@ -125,23 +129,35 @@ def get_collections(
     doctor_id: Optional[int] = Query(None),
     employee_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role("admin", "manager", "hr"))
+    current_user: models.User = Depends(require_role("admin", "manager", "hr", "employee"))
 ):
     query = db.query(models.Collection)
-    
-    if month is not None:
+
+    # Employees can only see their own collections
+    if current_user.role == "employee":
+        if current_user.employee_id:
+            query = query.filter(models.Collection.employee_id == current_user.employee_id)
+        else:
+            return []  # employee has no linked employee record
+    else:
+        if month is not None:
+            query = query.filter(extract('month', models.Collection.date) == month)
+        if year is not None:
+            query = query.filter(extract('year', models.Collection.date) == year)
+        if stockist_id:
+            query = query.filter(models.Collection.stockist_id == stockist_id)
+        if doctor_id:
+            query = query.filter(models.Collection.doctor_id == doctor_id)
+        if employee_id:
+            query = query.filter(models.Collection.employee_id == employee_id)
+
+    if month is not None and current_user.role == "employee":
         query = query.filter(extract('month', models.Collection.date) == month)
-    if year is not None:
+    if year is not None and current_user.role == "employee":
         query = query.filter(extract('year', models.Collection.date) == year)
     if collection_type:
         query = query.filter(models.Collection.collection_type == collection_type)
-    if stockist_id:
-        query = query.filter(models.Collection.stockist_id == stockist_id)
-    if doctor_id:
-        query = query.filter(models.Collection.doctor_id == doctor_id)
-    if employee_id:
-        query = query.filter(models.Collection.employee_id == employee_id)
-        
+
     cols = query.order_by(models.Collection.date.desc()).all()
     for c in cols:
         set_display_names(c, db)

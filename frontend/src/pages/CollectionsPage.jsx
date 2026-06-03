@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import api from '../api';
 import toast from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
 import { 
   HiOutlinePlus, HiOutlinePencil, HiOutlineTrash, HiOutlineX, 
   HiOutlineDownload, HiOutlineTrendingUp, HiOutlineTruck, HiOutlineHeart, 
@@ -9,6 +10,8 @@ import {
 } from 'react-icons/hi';
 
 export default function CollectionsPage() {
+  const { user } = useAuth();
+  const isEmployee = user?.role === 'employee';
   const [collections, setCollections] = useState([]);
   const [stockists, setStockists] = useState([]);
   const [doctors, setDoctors] = useState([]);
@@ -197,23 +200,30 @@ export default function CollectionsPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="page-title">Payment Collections</h1>
-          <p className="text-sm text-gray-500 mt-1">Track and manage cash/UPI payments from stockists and doctors</p>
+          <p className="text-sm text-gray-500 mt-1">
+            {isEmployee ? 'Your recorded payment collections' : 'Track and manage cash/UPI payments from stockists and doctors'}
+          </p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={handleDownloadExcel} className="btn-secondary flex items-center gap-2">
-            <HiOutlineDownload className="w-4 h-4" /> Download Excel
-          </button>
-          <button onClick={handleDownloadPDF} className="btn-secondary flex items-center gap-2">
-            <HiOutlineDocumentText className="w-4 h-4" /> Download PDF
-          </button>
+          {!isEmployee && (
+            <>
+              <button onClick={handleDownloadExcel} className="btn-secondary flex items-center gap-2">
+                <HiOutlineDownload className="w-4 h-4" /> Download Excel
+              </button>
+              <button onClick={handleDownloadPDF} className="btn-secondary flex items-center gap-2">
+                <HiOutlineDocumentText className="w-4 h-4" /> Download PDF
+              </button>
+            </>
+          )}
           <button onClick={() => { setEditing(null); resetForm(); setShowModal(true); }} className="btn-primary flex items-center gap-2">
             <HiOutlinePlus className="w-4 h-4" /> Record Collection
           </button>
         </div>
       </div>
 
-      {/* Monthly Summary Cards (Curated premium aesthetics) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* Monthly Summary Cards — hidden for employees */}
+      {!isEmployee && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
         {/* Stockists Collections Card */}
         <div className="relative overflow-hidden bg-white border border-[#E1ECEB] rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
@@ -252,6 +262,7 @@ export default function CollectionsPage() {
         </div>
 
       </div>
+      )}
 
       {/* Controls & Filter Bar */}
       <div className="bg-[#E3EFEF]/70 border border-[#D5E5E4] rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
@@ -316,12 +327,16 @@ export default function CollectionsPage() {
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">{c.remarks || '—'}</td>
                   <td className="px-6 py-4 text-right space-x-2">
-                    <button onClick={() => handleEdit(c)} className="text-gray-400 hover:text-[#14A89C]">
-                      <HiOutlinePencil className="w-4 h-4 inline" />
-                    </button>
-                    <button onClick={() => handleDelete(c.id)} className="text-gray-400 hover:text-red-600">
-                      <HiOutlineTrash className="w-4 h-4 inline" />
-                    </button>
+                    {!isEmployee && (
+                      <>
+                        <button onClick={() => handleEdit(c)} className="text-gray-400 hover:text-[#14A89C]">
+                          <HiOutlinePencil className="w-4 h-4 inline" />
+                        </button>
+                        <button onClick={() => handleDelete(c.id)} className="text-gray-400 hover:text-red-600">
+                          <HiOutlineTrash className="w-4 h-4 inline" />
+                        </button>
+                      </>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -399,18 +414,20 @@ export default function CollectionsPage() {
                 </div>
               )}
 
-              {/* Collected By (MR / Employee) */}
-              <div>
-                <label className="block text-sm text-[#4A6D71] font-semibold mb-1">Collected By (MR / Employee)</label>
-                <select 
-                  value={form.employee_id} 
-                  onChange={e => setForm({ ...form, employee_id: e.target.value })}
-                  className="input-field"
-                >
-                  <option value="">-- Select MR (Optional) --</option>
-                  {employees.map(e => <option key={e.id} value={e.id}>{e.name} ({e.post || e.role})</option>)}
-                </select>
-              </div>
+              {/* Collected By (MR / Employee) — hidden for employees, backend sets automatically */}
+              {!isEmployee && (
+                <div>
+                  <label className="block text-sm text-[#4A6D71] font-semibold mb-1">Collected By (MR / Employee)</label>
+                  <select 
+                    value={form.employee_id} 
+                    onChange={e => setForm({ ...form, employee_id: e.target.value })}
+                    className="input-field"
+                  >
+                    <option value="">-- Select MR (Optional) --</option>
+                    {employees.map(e => <option key={e.id} value={e.id}>{e.name} ({e.post || e.role})</option>)}
+                  </select>
+                </div>
+              )}
 
               {/* Amount & Mode Group */}
               <div className="grid grid-cols-2 gap-4">

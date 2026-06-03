@@ -43,7 +43,7 @@ export default function App() {
             {/* Role protected routes using robust RoleRoute */}
             <Route path="employees" element={<RoleRoute allowedRoles={['admin', 'hr']}><EmployeesPage /></RoleRoute>} />
             <Route path="salary" element={<RoleRoute allowedRoles={['admin', 'hr']}><SalaryPage /></RoleRoute>} />
-            <Route path="collections" element={<RoleRoute allowedRoles={['admin', 'manager', 'hr']}><CollectionsPage /></RoleRoute>} />
+            <Route path="collections" element={<RoleRoute allowedRoles={['admin', 'manager', 'hr', 'employee']}><CollectionsPage /></RoleRoute>} />
             <Route path="reports" element={<RoleRoute allowedRoles={['admin', 'manager', 'hr']}><ReportsPage /></RoleRoute>} />
             <Route path="audit-logs" element={<RoleRoute allowedRoles={['admin']}><AuditLogsPage /></RoleRoute>} />
             
