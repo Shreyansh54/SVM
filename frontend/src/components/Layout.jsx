@@ -16,7 +16,7 @@ const allNavItems = [
   { path: '/stockists', label: 'Stockists', icon: HiOutlineTruck, roles: ['admin', 'manager'] },
   { path: '/products', label: 'Products', icon: HiOutlineCube, roles: ['admin'] },
   { path: '/batches', label: 'Batches', icon: HiOutlineCollection, roles: ['admin'] },
-  { path: '/doctors', label: 'Doctors', icon: HiOutlineHeart, roles: ['admin', 'manager'] },
+  { path: '/doctors', label: 'Doctors', icon: HiOutlineHeart, roles: ['admin', 'manager', 'employee'] },
   { path: '/sales', label: 'Sales', icon: HiOutlineShoppingCart, roles: ['admin', 'manager', 'employee'] },
   { path: '/stock', label: 'Stock', icon: HiOutlineClipboardList, roles: ['admin'] },
   { path: '/attendance', label: 'Attendance', icon: HiOutlineCalendar, roles: ['admin', 'manager', 'employee', 'hr'] },

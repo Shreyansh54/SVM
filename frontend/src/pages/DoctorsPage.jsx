@@ -3,8 +3,10 @@ import { createPortal } from 'react-dom';
 import api from '../api';
 import toast from 'react-hot-toast';
 import { HiOutlinePlus, HiOutlinePencil, HiOutlineTrash, HiOutlineX, HiOutlineClipboardList, HiOutlineShoppingCart } from 'react-icons/hi';
+import { useAuth } from '../context/AuthContext';
 
 export default function DoctorsPage() {
+  const { isEmployee } = useAuth();
   const [doctors, setDoctors] = useState([]);
   const [products, setProducts] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -153,9 +155,11 @@ export default function DoctorsPage() {
                         <button onClick={() => handleEdit(d)} className="text-gray-400 hover:text-primary-400 transition-colors">
                           <HiOutlinePencil className="w-4 h-4 inline" />
                         </button>
-                        <button onClick={() => handleDelete(d.id)} className="text-gray-400 hover:text-red-400 transition-colors">
-                          <HiOutlineTrash className="w-4 h-4 inline" />
-                        </button>
+                        {!isEmployee && (
+                          <button onClick={() => handleDelete(d.id)} className="text-gray-400 hover:text-red-400 transition-colors" title="Delete Doctor">
+                            <HiOutlineTrash className="w-4 h-4 inline" />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}

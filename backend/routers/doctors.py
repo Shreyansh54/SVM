@@ -14,7 +14,7 @@ router = APIRouter(prefix="/api", tags=["Doctors"])
 def create_doctor(
     doctor: schemas.DoctorCreate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role("admin", "manager"))
+    current_user: models.User = Depends(require_role("admin", "manager", "employee"))
 ):
     db_doc = models.Doctor(**doctor.model_dump())
     db.add(db_doc)
@@ -35,7 +35,7 @@ def get_doctors(
 def get_doctor(
     doctor_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role("admin", "manager"))
+    current_user: models.User = Depends(require_role("admin", "manager", "employee"))
 ):
     doc = db.query(models.Doctor).filter(models.Doctor.id == doctor_id).first()
     if not doc:
@@ -48,7 +48,7 @@ def update_doctor(
     doctor_id: int,
     update: schemas.DoctorUpdate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role("admin", "manager"))
+    current_user: models.User = Depends(require_role("admin", "manager", "employee"))
 ):
     doc = db.query(models.Doctor).filter(models.Doctor.id == doctor_id).first()
     if not doc:

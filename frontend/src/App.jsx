@@ -52,7 +52,7 @@ export default function App() {
             <Route path="stock" element={<RoleRoute allowedRoles={['admin']}><StockPage /></RoleRoute>} />
             
             <Route path="stockists" element={<RoleRoute allowedRoles={['admin', 'manager']}><StockistsPage /></RoleRoute>} />
-            <Route path="doctors" element={<RoleRoute allowedRoles={['admin', 'manager']}><DoctorsPage /></RoleRoute>} />
+            <Route path="doctors" element={<RoleRoute allowedRoles={['admin', 'manager', 'employee']}><DoctorsPage /></RoleRoute>} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
