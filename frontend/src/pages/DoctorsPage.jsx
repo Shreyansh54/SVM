@@ -23,14 +23,21 @@ export default function DoctorsPage() {
   const [orderForm, setOrderForm] = useState({ doctor_id: '', employee_id: '', product_id: '', quantity: 1, notes: '' });
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { loadAll(); }, []);
+  useEffect(() => { loadAll(); }, [isEmployee]);
 
   const loadAll = async () => {
     try {
-      const [dRes, pRes, eRes, oRes] = await Promise.all([
-        api.get('/doctors'), api.get('/products/'), api.get('/employees/'), api.get('/doctor-orders')
-      ]);
-      setDoctors(dRes.data); setProducts(pRes.data); setEmployees(eRes.data); setOrders(oRes.data);
+      if (isEmployee) {
+        const [dRes, pRes] = await Promise.all([
+          api.get('/doctors'), api.get('/products/')
+        ]);
+        setDoctors(dRes.data); setProducts(pRes.data);
+      } else {
+        const [dRes, pRes, eRes, oRes] = await Promise.all([
+          api.get('/doctors'), api.get('/products/'), api.get('/employees/'), api.get('/doctor-orders')
+        ]);
+        setDoctors(dRes.data); setProducts(pRes.data); setEmployees(eRes.data); setOrders(oRes.data);
+      }
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   };
@@ -88,11 +95,13 @@ export default function DoctorsPage() {
     } catch (err) { toast.error(err.response?.data?.detail || 'Error'); }
   };
 
-  const tabs = [
-    { key: 'doctors', label: 'Doctors', icon: '🩺' },
-    { key: 'prescriptions', label: 'Prescriptions', icon: '💊' },
-    { key: 'orders', label: 'Doctor Orders', icon: '📋' },
-  ];
+  const tabs = isEmployee 
+    ? [{ key: 'doctors', label: 'Doctors', icon: '🩺' }]
+    : [
+        { key: 'doctors', label: 'Doctors', icon: '🩺' },
+        { key: 'prescriptions', label: 'Prescriptions', icon: '💊' },
+        { key: 'orders', label: 'Doctor Orders', icon: '📋' },
+      ];
 
   return (
     <div className="space-y-6">
@@ -148,10 +157,12 @@ export default function DoctorsPage() {
                       <td className="px-6 py-4 text-gray-400 text-sm">{d.location || '—'}</td>
                       <td className="px-6 py-4"><span className="font-mono text-xs text-primary-400 bg-primary-500/10 px-2 py-1 rounded">{d.gstin || 'Unregistered'}</span></td>
                       <td className="px-6 py-4 text-right space-x-2">
-                        <button onClick={() => { setSelectedDoctor(d); loadPrescriptions(d.id); setActiveTab('prescriptions'); }}
-                          className="text-gray-400 hover:text-blue-400 transition-colors" title="View Prescriptions">
-                          <HiOutlineClipboardList className="w-4 h-4 inline" />
-                        </button>
+                        {!isEmployee && (
+                          <button onClick={() => { setSelectedDoctor(d); loadPrescriptions(d.id); setActiveTab('prescriptions'); }}
+                            className="text-gray-400 hover:text-blue-400 transition-colors" title="View Prescriptions">
+                            <HiOutlineClipboardList className="w-4 h-4 inline" />
+                          </button>
+                        )}
                         <button onClick={() => handleEdit(d)} className="text-gray-400 hover:text-primary-400 transition-colors">
                           <HiOutlinePencil className="w-4 h-4 inline" />
                         </button>
