@@ -49,14 +49,13 @@ export default function CollectionsPage() {
 
   const loadMetaData = async () => {
     try {
-      const [stRes, docRes, empRes] = await Promise.all([
-        api.get('/stockists/'),
-        api.get('/doctors/'),
-        api.get('/employees/')
-      ]);
-      setStockists(stRes.data);
-      setDoctors(docRes.data);
-      setEmployees(empRes.data);
+      // Employees don't need the full employees list (they can't pick "collected by")
+      const promises = [api.get('/stockists/'), api.get('/doctors/')];
+      if (!isEmployee) promises.push(api.get('/employees/'));
+      const results = await Promise.all(promises);
+      setStockists(results[0].data);
+      setDoctors(results[1].data);
+      if (!isEmployee) setEmployees(results[2].data);
     } catch {
       toast.error('Failed to load stockist or doctor lists.');
     }
@@ -65,12 +64,12 @@ export default function CollectionsPage() {
   const loadCollections = async () => {
     setLoading(true);
     try {
-      const [colsRes, sumRes] = await Promise.all([
-        api.get(`/collections/?month=${filterMonth}&year=${filterYear}`),
-        api.get(`/collections/summary?month=${filterMonth}&year=${filterYear}`)
-      ]);
-      setCollections(colsRes.data);
-      setSummary(sumRes.data);
+      // Employees only fetch their own collections; summary endpoint is admin-only
+      const promises = [api.get(`/collections/?month=${filterMonth}&year=${filterYear}`)];
+      if (!isEmployee) promises.push(api.get(`/collections/summary?month=${filterMonth}&year=${filterYear}`));
+      const results = await Promise.all(promises);
+      setCollections(results[0].data);
+      if (!isEmployee) setSummary(results[1].data);
     } catch {
       toast.error('Failed to load collections data.');
     } finally {
