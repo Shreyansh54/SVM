@@ -234,9 +234,9 @@ class Collection(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     collection_type = Column(String, nullable=False)  # "stockist" or "doctor"
-    stockist_id = Column(Integer, ForeignKey("stockists.id"), nullable=True)
-    doctor_id = Column(Integer, ForeignKey("doctors.id"), nullable=True)
-    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=True)  # MR who collected it
+    stockist_id = Column(Integer, ForeignKey("stockists.id", ondelete="SET NULL"), nullable=True)
+    doctor_id = Column(Integer, ForeignKey("doctors.id", ondelete="SET NULL"), nullable=True)
+    employee_id = Column(Integer, ForeignKey("employees.id", ondelete="SET NULL"), nullable=True)  # MR who collected it
     amount = Column(Float, nullable=False)
     payment_mode = Column(String, default="Cash")  # UPI, Cash, Cheque, Bank Transfer
     date = Column(Date, nullable=False)

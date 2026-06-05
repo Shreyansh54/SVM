@@ -68,6 +68,29 @@ def delete_stockist(
     st = db.query(models.Stockist).filter(models.Stockist.id == stockist_id).first()
     if not st:
         raise HTTPException(status_code=404, detail="Stockist not found")
-    db.delete(st)
-    db.commit()
-    return {"message": "Stockist deleted"}
+
+    try:
+        # 1. Delete Stock records (stockist_id is NOT NULL — must delete first)
+        db.query(models.Stock).filter(
+            models.Stock.stockist_id == stockist_id
+        ).delete(synchronize_session=False)
+
+        # 2. Delete Sales records linked to this stockist
+        db.query(models.Sale).filter(
+            models.Sale.stockist_id == stockist_id
+        ).delete(synchronize_session=False)
+
+        # 3. Nullify Collections (stockist_id is nullable)
+        db.query(models.Collection).filter(
+            models.Collection.stockist_id == stockist_id
+        ).update({"stockist_id": None}, synchronize_session=False)
+
+        # 4. Delete the stockist itself
+        db.delete(st)
+        db.commit()
+        return {"message": f"Stockist '{st.name}' and all associated records deleted successfully."}
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+

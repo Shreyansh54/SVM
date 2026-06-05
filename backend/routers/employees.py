@@ -81,34 +81,54 @@ def delete_employee(
     emp = db.query(models.Employee).filter(models.Employee.id == employee_id).first()
     if not emp:
         raise HTTPException(status_code=404, detail="Employee not found")
-    
+
     emp_name = emp.name
     try:
-        # Delete associated login user accounts so they can be recreated with the same name
+        # 1. Delete linked User accounts (login credentials)
         associated_users = db.query(models.User).filter(
-            (models.User.employee_id == employee_id) | 
+            (models.User.employee_id == employee_id) |
             (models.User.username == emp.name)
         ).all()
         for user in associated_users:
             db.delete(user)
+        db.flush()  # flush user deletions before removing employee FK refs
 
-        # 1. Delete associated Attendance records
-        db.query(models.Attendance).filter(models.Attendance.employee_id == employee_id).delete()
+        # 2. Delete Attendance records
+        db.query(models.Attendance).filter(
+            models.Attendance.employee_id == employee_id
+        ).delete(synchronize_session=False)
 
-        # 2. Delete associated Salary records
-        db.query(models.Salary).filter(models.Salary.employee_id == employee_id).delete()
+        # 3. Delete Salary records
+        db.query(models.Salary).filter(
+            models.Salary.employee_id == employee_id
+        ).delete(synchronize_session=False)
 
-        # 3. Delete associated Sales records
-        db.query(models.Sale).filter(models.Sale.employee_id == employee_id).delete()
+        # 4. Nullify or delete Sales records
+        #    Sales has employee_id NOT NULL so we delete them
+        db.query(models.Sale).filter(
+            models.Sale.employee_id == employee_id
+        ).delete(synchronize_session=False)
 
-        # 4. Delete associated Doctor Orders
-        db.query(models.DoctorOrder).filter(models.DoctorOrder.employee_id == employee_id).delete()
+        # 5. Delete Doctor Orders
+        db.query(models.DoctorOrder).filter(
+            models.DoctorOrder.employee_id == employee_id
+        ).delete(synchronize_session=False)
 
-        # 5. Delete the employee record itself
+        # 6. Nullify Collections (employee_id is nullable there)
+        db.query(models.Collection).filter(
+            models.Collection.employee_id == employee_id
+        ).update({"employee_id": None}, synchronize_session=False)
+
+        # 7. Finally delete the employee
         db.delete(emp)
         db.commit()
-        log_action(db, current_user.username, "DELETE_EMPLOYEE", f"Deleted employee {emp_name} (ID: {employee_id}) and all their associated records (sales, attendance, salary, user login).")
-        return {"message": "Employee and all associated records deleted successfully."}
+
+        log_action(
+            db, current_user.username, "DELETE_EMPLOYEE",
+            f"Deleted employee {emp_name} (ID: {employee_id}) and all associated records."
+        )
+        return {"message": f"Employee '{emp_name}' and all associated records deleted successfully."}
+
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))

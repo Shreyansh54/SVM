@@ -26,6 +26,15 @@ def run_migrations():
             "ALTER TABLE products ADD COLUMN IF NOT EXISTS mrp FLOAT DEFAULT 0.0",
             "ALTER TABLE products ADD COLUMN IF NOT EXISTS pts FLOAT DEFAULT 0.0",
             "ALTER TABLE products ADD COLUMN IF NOT EXISTS ptr FLOAT DEFAULT 0.0",
+            # Drop and recreate collections employee foreign key with ON DELETE SET NULL
+            "ALTER TABLE collections DROP CONSTRAINT IF EXISTS collections_employee_id_fkey",
+            "ALTER TABLE collections ADD CONSTRAINT collections_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE SET NULL",
+            # Drop and recreate collections stockist foreign key with ON DELETE SET NULL
+            "ALTER TABLE collections DROP CONSTRAINT IF EXISTS collections_stockist_id_fkey",
+            "ALTER TABLE collections ADD CONSTRAINT collections_stockist_id_fkey FOREIGN KEY (stockist_id) REFERENCES stockists(id) ON DELETE SET NULL",
+            # Drop and recreate collections doctor foreign key with ON DELETE SET NULL
+            "ALTER TABLE collections DROP CONSTRAINT IF EXISTS collections_doctor_id_fkey",
+            "ALTER TABLE collections ADD CONSTRAINT collections_doctor_id_fkey FOREIGN KEY (doctor_id) REFERENCES doctors(id) ON DELETE SET NULL",
         ]
         for sql in migrations:
             try:
