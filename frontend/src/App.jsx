@@ -18,6 +18,7 @@ import DoctorsPage from './pages/DoctorsPage';
 import BatchesPage from './pages/BatchesPage';
 import AuditLogsPage from './pages/AuditLogsPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+import GoogleCallback from './pages/GoogleCallback';
 import { Toaster } from 'react-hot-toast';
 
 export default function App() {
@@ -35,6 +36,7 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/auth/callback" element={<GoogleCallback />} />
           <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route index element={<Dashboard />} />
             <Route path="sales" element={<SalesPage />} />

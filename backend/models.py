@@ -172,6 +172,7 @@ class User(Base):
     employee_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
     must_change_password = Column(Boolean, default=True)
     profile_picture = Column(Text, nullable=True)  # base64 encoded image
+    google_email = Column(String, nullable=True, unique=True)  # linked Google account
 
     employee = relationship("Employee", back_populates="user")
 

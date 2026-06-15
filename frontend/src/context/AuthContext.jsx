@@ -44,6 +44,14 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Called by GoogleCallback after OAuth redirect
+  const loginWithToken = ({ token, username, role, employee_id, profile_picture }) => {
+    localStorage.setItem('token', token);
+    const userData = { username, role, employee_id, must_change_password: false, profile_picture: null };
+    localStorage.setItem('user', JSON.stringify(userData));
+    setUser(userData);
+  };
+
   const updateProfilePicture = async (base64Image) => {
     const res = await api.put('/profile-picture', { profile_picture: base64Image });
     const updated = { ...user, profile_picture: res.data.profile_picture };
@@ -56,7 +64,7 @@ export function AuthProvider({ children }) {
   const isEmployee = user?.role === 'employee';
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, loading, isAdmin, isManager, isEmployee, updatePasswordChanged, updateProfilePicture }}>
+    <AuthContext.Provider value={{ user, login, loginWithToken, register, logout, loading, isAdmin, isManager, isEmployee, updatePasswordChanged, updateProfilePicture }}>
       {children}
     </AuthContext.Provider>
   );

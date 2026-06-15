@@ -1,5 +1,8 @@
 import os
+import secrets
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from database import get_db
 from auth import get_password_hash, verify_password, create_access_token, log_action, get_current_user
@@ -7,6 +10,12 @@ import models
 import schemas
 
 router = APIRouter(prefix="/api", tags=["Auth"])
+
+GOOGLE_CLIENT_ID     = os.getenv("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
+BACKEND_URL          = os.getenv("BACKEND_URL", "https://shreyansh-vollora-backend.onrender.com")
+FRONTEND_URL         = os.getenv("FRONTEND_URL", "https://svm-xi.vercel.app")
+GOOGLE_REDIRECT_URI  = f"{BACKEND_URL}/api/auth/google/callback"
 
 
 @router.post("/register", response_model=schemas.UserOut)
@@ -298,3 +307,112 @@ def change_password(
     log_action(db, current_user.username, "UPDATE_PASSWORD", "User successfully updated their password on first-time login.")
     return {"message": "Password updated successfully!"}
 
+
+# ── Google OAuth ────────────────────────────────────────────────────────────
+
+@router.get("/auth/google")
+def google_login():
+    """Redirect user to Google's OAuth consent screen."""
+    if not GOOGLE_CLIENT_ID:
+        raise HTTPException(status_code=503, detail="Google OAuth not configured.")
+    params = (
+        f"?client_id={GOOGLE_CLIENT_ID}"
+        "&response_type=code"
+        "&scope=openid+email+profile"
+        f"&redirect_uri={GOOGLE_REDIRECT_URI}"
+        "&access_type=offline"
+        "&prompt=select_account"
+    )
+    return RedirectResponse(f"https://accounts.google.com/o/oauth2/v2/auth{params}")
+
+
+@router.get("/auth/google/callback")
+def google_callback(code: str = None, error: str = None, db: Session = Depends(get_db)):
+    """Handle Google OAuth callback — exchange code for user info, issue JWT."""
+    if error or not code:
+        return RedirectResponse(f"{FRONTEND_URL}/login?error=google_denied")
+
+    # 1. Exchange code for tokens
+    token_res = httpx.post(
+        "https://oauth2.googleapis.com/token",
+        data={
+            "code": code,
+            "client_id": GOOGLE_CLIENT_ID,
+            "client_secret": GOOGLE_CLIENT_SECRET,
+            "redirect_uri": GOOGLE_REDIRECT_URI,
+            "grant_type": "authorization_code",
+        },
+    )
+    if token_res.status_code != 200:
+        return RedirectResponse(f"{FRONTEND_URL}/login?error=google_token_failed")
+
+    access_token = token_res.json().get("access_token")
+
+    # 2. Fetch user info from Google
+    info_res = httpx.get(
+        "https://www.googleapis.com/oauth2/v3/userinfo",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    if info_res.status_code != 200:
+        return RedirectResponse(f"{FRONTEND_URL}/login?error=google_userinfo_failed")
+
+    info      = info_res.json()
+    g_email   = info.get("email", "").strip().lower()
+    g_name    = info.get("name", "").strip()
+    g_picture = info.get("picture", None)
+
+    # 3. Find existing user by google_email field or username
+    user = db.query(models.User).filter(models.User.google_email == g_email).first()
+
+    if not user:
+        # Try to link to existing employee by matching email
+        emp = db.query(models.Employee).filter(
+            models.Employee.email.ilike(g_email)
+        ).first()
+
+        if emp:
+            # Find the linked user account (by employee_id or username == emp.name)
+            user = db.query(models.User).filter(
+                (models.User.employee_id == emp.id) |
+                (models.User.username == emp.name)
+            ).first()
+            if user:
+                # Link google email to existing user
+                user.google_email = g_email
+                if not user.profile_picture and g_picture:
+                    user.profile_picture = g_picture
+                db.commit()
+        
+        if not user:
+            # Create a brand-new user account
+            username = g_email.split("@")[0]  # use email prefix as username
+            # Ensure unique username
+            existing = db.query(models.User).filter(models.User.username == username).first()
+            if existing:
+                username = f"{username}_{secrets.token_hex(3)}"
+            user = models.User(
+                username=username,
+                password_hash=get_password_hash(secrets.token_hex(16)),
+                role="employee",
+                must_change_password=False,
+                google_email=g_email,
+                profile_picture=g_picture,
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+            log_action(db, user.username, "GOOGLE_REGISTER", f"New account via Google OAuth ({g_email})")
+
+    log_action(db, user.username, "GOOGLE_LOGIN", f"Logged in via Google ({g_email})")
+
+    # 4. Issue JWT and redirect to frontend
+    jwt = create_access_token(data={"sub": user.username, "role": user.role, "employee_id": user.employee_id})
+    redirect_url = (
+        f"{FRONTEND_URL}/auth/callback"
+        f"?token={jwt}"
+        f"&role={user.role}"
+        f"&username={user.username}"
+        f"&employee_id={user.employee_id or ''}"
+        f"&profile_picture={'1' if user.profile_picture else ''}"
+    )
+    return RedirectResponse(redirect_url)

@@ -327,3 +327,70 @@ def get_monthly_sales(
         monthly[month_key]["total_amount"] += s.total_amount
         monthly[month_key]["total_count"] += 1
     return list(monthly.values())
+
+
+@router.delete("/{sale_id}")
+def delete_sale(
+    sale_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    sale = db.query(models.Sale).filter(models.Sale.id == sale_id).first()
+    if not sale:
+        raise HTTPException(status_code=404, detail="Sale record not found")
+
+    # Permissions check: admins/managers can delete anything; employees can only delete their own sales
+    if current_user.role == "employee" and sale.employee_id != current_user.employee_id:
+        raise HTTPException(status_code=403, detail="You do not have permission to delete this sale record")
+
+    # Restore stock for stockist sales
+    if (sale.sale_type or "stockist") == "stockist":
+        stock_query = db.query(models.Stock).filter(
+            models.Stock.stockist_id == sale.stockist_id,
+            models.Stock.product_id == sale.product_id
+        )
+        if sale.batch_id:
+            stock_query = stock_query.filter(models.Stock.batch_id == sale.batch_id)
+        stock = stock_query.first()
+        if stock:
+            stock.quantity += (sale.quantity_sold + (sale.bonus_quantity or 0))
+
+    db.delete(sale)
+    db.commit()
+    return {"message": "Sale record deleted and stock restored successfully"}
+
+
+@router.delete("/order/{sale_order_id}")
+def delete_sales_order(
+    sale_order_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    sales = db.query(models.Sale).filter(models.Sale.sale_order_id == sale_order_id).all()
+    if not sales:
+        raise HTTPException(status_code=404, detail="Sales order not found")
+
+    # Permissions check: if any sale belongs to another employee, block employee
+    if current_user.role == "employee":
+        for s in sales:
+            if s.employee_id != current_user.employee_id:
+                raise HTTPException(status_code=403, detail="You do not have permission to delete this sales order")
+
+    # Restore stock for each line item
+    for sale in sales:
+        if (sale.sale_type or "stockist") == "stockist":
+            stock_query = db.query(models.Stock).filter(
+                models.Stock.stockist_id == sale.stockist_id,
+                models.Stock.product_id == sale.product_id
+            )
+            if sale.batch_id:
+                stock_query = stock_query.filter(models.Stock.batch_id == sale.batch_id)
+            stock = stock_query.first()
+            if stock:
+                stock.quantity += (sale.quantity_sold + (sale.bonus_quantity or 0))
+
+        db.delete(sale)
+
+    db.commit()
+    return {"message": f"Sales order '{sale_order_id}' deleted and stock restored successfully"}
+

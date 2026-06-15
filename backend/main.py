@@ -37,6 +37,8 @@ def run_migrations():
             "ALTER TABLE collections ADD CONSTRAINT collections_doctor_id_fkey FOREIGN KEY (doctor_id) REFERENCES doctors(id) ON DELETE SET NULL",
             # Profile picture stored as base64 text
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_picture TEXT",
+            # Google OAuth email linkage
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS google_email VARCHAR",
         ]
         for sql in migrations:
             try:
