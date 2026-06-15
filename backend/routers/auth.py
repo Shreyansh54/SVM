@@ -94,7 +94,23 @@ def login(req: schemas.LoginRequest, db: Session = Depends(get_db)):
 
     token = create_access_token(data={"sub": user.username, "role": role, "employee_id": user.employee_id})
     log_action(db, user.username, "USER_LOGIN", f"User logged in successfully (Role: {role})")
-    return {"access_token": token, "token_type": "bearer", "role": role, "employee_id": user.employee_id, "must_change_password": user.must_change_password}
+    return {"access_token": token, "token_type": "bearer", "role": role, "employee_id": user.employee_id, "must_change_password": user.must_change_password, "profile_picture": user.profile_picture}
+
+
+@router.put("/profile-picture")
+def update_profile_picture(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Upload or clear profile picture (stored as base64 string)."""
+    picture_data = payload.get("profile_picture")  # base64 string or None to clear
+    if picture_data and len(picture_data) > 5 * 1024 * 1024:  # 5MB limit
+        raise HTTPException(status_code=400, detail="Image too large. Please use an image under 2MB.")
+    current_user.profile_picture = picture_data
+    db.commit()
+    db.refresh(current_user)
+    return {"profile_picture": current_user.profile_picture, "message": "Profile picture updated"}
 
 
 @router.post("/forgot-password")

@@ -16,6 +16,7 @@ class UserOut(BaseModel):
     username: str
     role: str
     employee_id: Optional[int] = None
+    profile_picture: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -27,6 +28,7 @@ class Token(BaseModel):
     role: str
     employee_id: Optional[int] = None
     must_change_password: bool
+    profile_picture: Optional[str] = None
 
 
 class LoginRequest(BaseModel):

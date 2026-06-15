@@ -171,6 +171,7 @@ class User(Base):
     role = Column(String, default="employee")
     employee_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
     must_change_password = Column(Boolean, default=True)
+    profile_picture = Column(Text, nullable=True)  # base64 encoded image
 
     employee = relationship("Employee", back_populates="user")
 

@@ -27,7 +27,7 @@ const allNavItems = [
 ];
 
 export default function Layout() {
-  const { user, logout, updatePasswordChanged } = useAuth();
+  const { user, logout, updatePasswordChanged, updateProfilePicture } = useAuth();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [newPassword, setNewPassword] = useState('');
@@ -194,13 +194,60 @@ export default function Layout() {
         {/* User section */}
         <div className="border-t border-[#D5E5E4] p-4">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-8 h-8 rounded-lg bg-[#0A373A]/10 flex items-center justify-center">
-              <span className="text-xs font-bold text-[#0A373A]">{user?.username?.[0]?.toUpperCase()}</span>
-            </div>
+            {/* Clickable profile picture */}
+            <label className="relative cursor-pointer group flex-shrink-0" title="Change profile picture">
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files[0];
+                  if (!file) return;
+                  if (file.size > 2 * 1024 * 1024) {
+                    alert('Image must be under 2MB');
+                    return;
+                  }
+                  const reader = new FileReader();
+                  reader.onload = async () => {
+                    try {
+                      await updateProfilePicture(reader.result);
+                    } catch {
+                      alert('Failed to update photo');
+                    }
+                  };
+                  reader.readAsDataURL(file);
+                }}
+              />
+              <div className="w-9 h-9 rounded-lg overflow-hidden bg-[#0A373A]/10 flex items-center justify-center ring-2 ring-transparent group-hover:ring-[#14A89C] transition-all">
+                {user?.profile_picture
+                  ? <img src={user.profile_picture} alt="Profile" className="w-full h-full object-cover" />
+                  : <span className="text-xs font-bold text-[#0A373A]">{user?.username?.[0]?.toUpperCase()}</span>
+                }
+              </div>
+              {/* Camera overlay on hover */}
+              <div className="absolute inset-0 rounded-lg bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </div>
+            </label>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-[#0A373A] truncate">{user?.username}</p>
               <p className="text-xs text-[#4A6D71] capitalize">{user?.role}</p>
             </div>
+            {/* Remove photo button */}
+            {user?.profile_picture && (
+              <button
+                onClick={async () => { try { await updateProfilePicture(null); } catch {} }}
+                className="text-[#4A6D71] hover:text-red-500 transition-colors flex-shrink-0"
+                title="Remove photo"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
           </div>
           <button onClick={logout}
             className="flex items-center gap-2 w-full px-3 py-2 rounded-xl text-sm text-[#4A6D71] hover:text-red-600 hover:bg-red-50/50 transition-all duration-200">
@@ -208,6 +255,7 @@ export default function Layout() {
             Sign Out
           </button>
         </div>
+
       </aside>
 
       {/* Main content */}

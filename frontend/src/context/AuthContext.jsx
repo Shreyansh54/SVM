@@ -1,5 +1,4 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import api from '../api';
 
 const AuthContext = createContext(null);
@@ -19,10 +18,9 @@ export function AuthProvider({ children }) {
 
   const login = async (username, password) => {
     const res = await api.post('/login', { username, password });
-    const { access_token, role, employee_id, must_change_password } = res.data;
+    const { access_token, role, employee_id, must_change_password, profile_picture } = res.data;
     localStorage.setItem('token', access_token);
-
-    const userData = { username, role, employee_id, must_change_password };
+    const userData = { username, role, employee_id, must_change_password, profile_picture };
     localStorage.setItem('user', JSON.stringify(userData));
     setUser(userData);
     return userData;
@@ -46,12 +44,19 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const updateProfilePicture = async (base64Image) => {
+    const res = await api.put('/profile-picture', { profile_picture: base64Image });
+    const updated = { ...user, profile_picture: res.data.profile_picture };
+    localStorage.setItem('user', JSON.stringify(updated));
+    setUser(updated);
+  };
+
   const isAdmin = user?.role === 'admin';
   const isManager = user?.role === 'manager';
   const isEmployee = user?.role === 'employee';
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, loading, isAdmin, isManager, isEmployee, updatePasswordChanged }}>
+    <AuthContext.Provider value={{ user, login, register, logout, loading, isAdmin, isManager, isEmployee, updatePasswordChanged, updateProfilePicture }}>
       {children}
     </AuthContext.Provider>
   );

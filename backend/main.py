@@ -35,6 +35,8 @@ def run_migrations():
             # Drop and recreate collections doctor foreign key with ON DELETE SET NULL
             "ALTER TABLE collections DROP CONSTRAINT IF EXISTS collections_doctor_id_fkey",
             "ALTER TABLE collections ADD CONSTRAINT collections_doctor_id_fkey FOREIGN KEY (doctor_id) REFERENCES doctors(id) ON DELETE SET NULL",
+            # Profile picture stored as base64 text
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_picture TEXT",
         ]
         for sql in migrations:
             try:
