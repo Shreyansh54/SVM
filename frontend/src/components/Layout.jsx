@@ -74,8 +74,8 @@ export default function Layout() {
 
         <div className="bg-white border border-[#E1ECEB] rounded-2xl p-8 max-w-md w-full shadow-2xl relative z-10 animate-fade-in">
           <div className="text-center mb-6">
-            <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-[#0A373A] to-[#14A89C] flex items-center justify-center shadow-xl mb-4">
-              <span className="text-xl font-bold text-white">SV</span>
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-white flex items-center justify-center shadow-xl mb-4 overflow-hidden border border-[#E1ECEB]">
+              <img src="/logo.jpg" alt="Shreyansh Vollora Logo" className="w-full h-full object-contain p-1" />
             </div>
             <h1 className="text-2xl font-bold text-[#1A3D40]">SHREYANSH VOLLORA</h1>
             <p className="text-xs text-[#14A89C] font-semibold uppercase tracking-widest mt-1">Every Step GUIDED BY CARE</p>
@@ -156,8 +156,8 @@ export default function Layout() {
       `}>
         {/* Logo */}
         <div className="flex items-center gap-3 px-6 py-5 border-b border-[#D5E5E4]">
-          <div className="w-9 h-9 rounded-xl bg-[#0A373A] flex items-center justify-center shadow-md">
-            <span className="text-white font-bold text-sm">SV</span>
+          <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center shadow-md overflow-hidden">
+            <img src="/logo.jpg" alt="Shreyansh Vollora Logo" className="w-full h-full object-contain" />
           </div>
           <div>
             <h1 className="text-base font-bold text-[#0A373A] tracking-tight">SHREYANSH VOLLORA</h1>

@@ -53,8 +53,8 @@ export default function LoginPage() {
       <div className="card w-full max-w-md animate-fade-in relative bg-white border border-[#E1ECEB] shadow-2xl">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-[#0A373A] to-[#14A89C] flex items-center justify-center shadow-xl mb-4 animate-pulse-glow">
-            <span className="text-xl font-bold text-[#1A3D40]">SV</span>
+          <div className="w-20 h-20 mx-auto rounded-2xl bg-white flex items-center justify-center shadow-xl mb-4 animate-pulse-glow overflow-hidden border border-[#E1ECEB]">
+            <img src="/logo.jpg" alt="Shreyansh Vollora Logo" className="w-full h-full object-contain p-1" />
           </div>
           <h1 className="text-2xl font-bold text-[#1A3D40]">SHREYANSH VOLLORA</h1>
           <p className="text-sm text-[#5B7F83] mt-1 font-semibold tracking-wide">Every Step GUIDED BY CARE</p>
