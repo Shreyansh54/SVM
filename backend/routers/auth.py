@@ -363,45 +363,55 @@ def google_callback(code: str = None, error: str = None, db: Session = Depends(g
     g_name    = info.get("name", "").strip()
     g_picture = info.get("picture", None)
 
-    # 3. Find existing user by google_email field or username
+    # 3. Find existing user by google_email field
     user = db.query(models.User).filter(models.User.google_email == g_email).first()
 
+    # Try to find employee with matching email
+    emp = db.query(models.Employee).filter(
+        models.Employee.email.ilike(g_email)
+    ).first()
+
     if not user:
-        # Try to link to existing employee by matching email
-        emp = db.query(models.Employee).filter(
-            models.Employee.email.ilike(g_email)
+        if not emp:
+            # Reject login since email is not registered to any user or employee
+            return RedirectResponse(f"{FRONTEND_URL}/login?error=email_not_found")
+        
+        # Link to existing user account for this employee (if any exists)
+        user = db.query(models.User).filter(
+            (models.User.employee_id == emp.id) |
+            (models.User.username == emp.name)
         ).first()
 
-        if emp:
-            # Find the linked user account (by employee_id or username == emp.name)
-            user = db.query(models.User).filter(
-                (models.User.employee_id == emp.id) |
-                (models.User.username == emp.name)
-            ).first()
-            if user:
-                # Link google email to existing user
-                user.google_email = g_email
-                if not user.profile_picture and g_picture:
-                    user.profile_picture = g_picture
-                db.commit()
-            else:
-                # Create a new user account linked to this employee
-                user = models.User(
-                    username=emp.name,
-                    password_hash=get_password_hash(secrets.token_hex(16)),
-                    role=emp.role,
-                    employee_id=emp.id,
-                    must_change_password=False,
-                    google_email=g_email,
-                    profile_picture=g_picture,
-                )
-                db.add(user)
-                db.commit()
-                db.refresh(user)
-                log_action(db, user.username, "GOOGLE_REGISTER", f"Linked and registered new account for employee {emp.name} ({g_email})")
+        if user:
+            # Link Google email to the existing user account
+            user.google_email = g_email
+            user.employee_id = emp.id
+            user.role = emp.role
+            if not user.profile_picture and g_picture:
+                user.profile_picture = g_picture
+            db.commit()
         else:
-            # Reject login since email does not belong to any employee
-            return RedirectResponse(f"{FRONTEND_URL}/login?error=email_not_found")
+            # Create a brand-new user account linked to this employee
+            user = models.User(
+                username=emp.name,
+                password_hash=get_password_hash(secrets.token_hex(16)),
+                role=emp.role,
+                employee_id=emp.id,
+                must_change_password=False,
+                google_email=g_email,
+                profile_picture=g_picture,
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+            log_action(db, user.username, "GOOGLE_REGISTER", f"Linked and registered new account for employee {emp.name} ({g_email})")
+    else:
+        # User already exists by google_email, ensure it's synced with the employee profile (if one exists)
+        if emp:
+            if user.employee_id != emp.id or user.role != emp.role:
+                user.employee_id = emp.id
+                user.role = emp.role
+                db.commit()
 
     log_action(db, user.username, "GOOGLE_LOGIN", f"Logged in via Google ({g_email})")
 
