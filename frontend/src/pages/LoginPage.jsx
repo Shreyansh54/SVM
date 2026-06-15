@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import api from '../api';
 
 export default function LoginPage() {
+  const [searchParams] = useSearchParams();
   const [mode, setMode] = useState('login'); // 'login', 'register', 'forgot'
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -13,6 +14,19 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const { login, register } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const error = searchParams.get('error');
+    if (error) {
+      if (error === 'email_not_found') {
+        toast.error('Your Google email is not registered in the system. Please contact your admin.', { duration: 6000 });
+      } else if (error === 'google_denied') {
+        toast.error('Google Sign-In access was denied.');
+      } else {
+        toast.error('Google Sign-In failed. Please try again.');
+      }
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

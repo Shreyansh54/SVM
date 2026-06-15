@@ -384,26 +384,24 @@ def google_callback(code: str = None, error: str = None, db: Session = Depends(g
                 if not user.profile_picture and g_picture:
                     user.profile_picture = g_picture
                 db.commit()
-        
-        if not user:
-            # Create a brand-new user account
-            username = g_email.split("@")[0]  # use email prefix as username
-            # Ensure unique username
-            existing = db.query(models.User).filter(models.User.username == username).first()
-            if existing:
-                username = f"{username}_{secrets.token_hex(3)}"
-            user = models.User(
-                username=username,
-                password_hash=get_password_hash(secrets.token_hex(16)),
-                role="employee",
-                must_change_password=False,
-                google_email=g_email,
-                profile_picture=g_picture,
-            )
-            db.add(user)
-            db.commit()
-            db.refresh(user)
-            log_action(db, user.username, "GOOGLE_REGISTER", f"New account via Google OAuth ({g_email})")
+            else:
+                # Create a new user account linked to this employee
+                user = models.User(
+                    username=emp.name,
+                    password_hash=get_password_hash(secrets.token_hex(16)),
+                    role=emp.role,
+                    employee_id=emp.id,
+                    must_change_password=False,
+                    google_email=g_email,
+                    profile_picture=g_picture,
+                )
+                db.add(user)
+                db.commit()
+                db.refresh(user)
+                log_action(db, user.username, "GOOGLE_REGISTER", f"Linked and registered new account for employee {emp.name} ({g_email})")
+        else:
+            # Reject login since email does not belong to any employee
+            return RedirectResponse(f"{FRONTEND_URL}/login?error=email_not_found")
 
     log_action(db, user.username, "GOOGLE_LOGIN", f"Logged in via Google ({g_email})")
 
