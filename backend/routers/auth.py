@@ -13,8 +13,10 @@ router = APIRouter(prefix="/api", tags=["Auth"])
 
 GOOGLE_CLIENT_ID     = os.getenv("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
-BACKEND_URL          = os.getenv("BACKEND_URL", "https://shreyansh-vollora-backend.onrender.com")
-FRONTEND_URL         = os.getenv("FRONTEND_URL", "https://svm-xi.vercel.app")
+_backend_raw         = os.getenv("BACKEND_URL", "https://shreyansh-vollora-backend.onrender.com")
+_frontend_raw        = os.getenv("FRONTEND_URL", "https://svm-xi.vercel.app")
+BACKEND_URL          = _backend_raw if _backend_raw.startswith("http") else f"https://{_backend_raw}"
+FRONTEND_URL         = _frontend_raw if _frontend_raw.startswith("http") else f"https://{_frontend_raw}"
 GOOGLE_REDIRECT_URI  = f"{BACKEND_URL}/api/auth/google/callback"
 
 
