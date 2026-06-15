@@ -132,7 +132,11 @@ export default function LoginPage() {
 
               {/* Google Sign-In */}
               <a
-                href="https://shreyansh-vollora-backend.onrender.com/api/auth/google"
+                href={
+                  import.meta.env.VITE_API_URL
+                    ? `${import.meta.env.VITE_API_URL}/auth/google`
+                    : '/api/auth/google'
+                }
                 className="flex items-center justify-center gap-3 w-full border border-[#D5E5E4] bg-white hover:bg-[#F7FAFA] text-[#1A3D40] text-sm font-semibold py-2.5 px-4 rounded-xl transition-all duration-200 shadow-sm hover:shadow"
               >
                 {/* Google G icon */}
