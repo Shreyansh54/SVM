@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import api from '../api';
 import toast from 'react-hot-toast';
-import { HiOutlinePlus, HiOutlineDownload, HiOutlineX, HiOutlineTrash } from 'react-icons/hi';
+import { HiOutlinePlus, HiOutlineDownload, HiOutlineX, HiOutlineTrash, HiOutlinePencil } from 'react-icons/hi';
 import { useAuth } from '../context/AuthContext';
 
 const BLANK_LINE = { product_id: '', batch_id: '', quantity_sold: '', bonus_quantity: '0', discount_percentage: '0', applied_price_type: 'mrp', manual_price: '' };
@@ -28,6 +28,11 @@ export default function SalesPage() {
   const [submitting, setSubmitting] = useState(false);
   const [doctorSearch, setDoctorSearch] = useState('');
   const [showDoctorDropdown, setShowDoctorDropdown] = useState(false);
+
+  // ── Edit state ─────────────────────────────────────────
+  const [editSale, setEditSale] = useState(null);   // the full sale object being edited
+  const [editForm, setEditForm] = useState({});      // controlled form values
+  const [editSubmitting, setEditSubmitting] = useState(false);
 
   useEffect(() => { load(); }, []);
 
@@ -56,7 +61,102 @@ export default function SalesPage() {
     } catch { toast.error('Invoice download failed'); }
   };
 
-  // ── Item line helpers ──────────────────────────────────
+  // ── Permission helper ──────────────────────────────────
+  const canEditSale = (s) => canManage || s.employee_id === user?.employee_id;
+
+  // ── Delete handlers ────────────────────────────────────
+  const handleDeleteSale = async (saleId) => {
+    if (!window.confirm('Delete this sale record? Stock will be restored if it was a stockist sale.')) return;
+    try {
+      await api.delete(`/sales/${saleId}`);
+      toast.success('Sale deleted and stock restored.');
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to delete sale');
+    }
+  };
+
+  const handleDeleteOrder = async (saleOrderId) => {
+    if (!window.confirm(`Delete the entire order "${saleOrderId}" and all its line items? Stock will be restored.`)) return;
+    try {
+      await api.delete(`/sales/order/${saleOrderId}`);
+      toast.success('Order deleted and stock restored.');
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to delete order');
+    }
+  };
+
+  // ── Edit handlers ──────────────────────────────────────
+  const openEdit = (s) => {
+    setEditSale(s);
+    setEditForm({
+      quantity_sold: s.quantity_sold,
+      bonus_quantity: s.bonus_quantity || 0,
+      discount_percentage: s.discount_percentage || 0,
+      batch_id: s.batch_id || '',
+      applied_price_type: 'mrp',   // price_type not stored in SaleOut, default mrp
+      manual_price: '',
+    });
+  };
+
+  const closeEdit = () => { setEditSale(null); setEditForm({}); };
+
+  // Live preview inside edit modal
+  const editPreview = () => {
+    if (!editSale) return null;
+    const product = products.find(p => p.id === editSale.product_id);
+    if (!product) return null;
+    const pt = editForm.applied_price_type || 'mrp';
+    let unitPrice;
+    if (pt === 'manual') {
+      unitPrice = parseFloat(editForm.manual_price || 0);
+      if (!unitPrice) return null;
+    } else if (pt === 'mrp' && editForm.batch_id) {
+      const b = batches.find(b => b.id == editForm.batch_id);
+      unitPrice = (b && b.mrp) ? b.mrp : product.mrp || product.price;
+    } else {
+      unitPrice = product[pt] || product.price;
+    }
+    const discount = parseFloat(editForm.discount_percentage || 0);
+    const qty = parseInt(editForm.quantity_sold || 0);
+    if (qty <= 0) return null;
+    const subtotal = qty * unitPrice * (1 - discount / 100);
+    const gst = editSale.gst_rate ?? 5.0;
+    const total = subtotal * (1 + gst / 100);
+    return { unitPrice, discount, qty, subtotal, gst, total };
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    if (!editSale) return;
+    const qty = parseInt(editForm.quantity_sold);
+    if (!qty || qty <= 0) { toast.error('Quantity must be greater than 0'); return; }
+    if (editForm.applied_price_type === 'manual' && (!editForm.manual_price || parseFloat(editForm.manual_price) <= 0)) {
+      toast.error('Enter a valid manual price'); return;
+    }
+    setEditSubmitting(true);
+    try {
+      const payload = {
+        quantity_sold: qty,
+        bonus_quantity: parseInt(editForm.bonus_quantity) || 0,
+        discount_percentage: parseFloat(editForm.discount_percentage) || 0,
+        batch_id: editForm.batch_id ? parseInt(editForm.batch_id) : null,
+        applied_price_type: editForm.applied_price_type || 'mrp',
+        manual_price: editForm.applied_price_type === 'manual' ? parseFloat(editForm.manual_price) : null,
+      };
+      await api.put(`/sales/${editSale.id}`, payload);
+      toast.success('Sale updated successfully!');
+      closeEdit();
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to update sale');
+    } finally {
+      setEditSubmitting(false);
+    }
+  };
+
+  // ── Item line helpers (new order) ──────────────────────
   const updateItem = (idx, field, value) => {
     const items = order.items.map((it, i) => i === idx ? { ...it, [field]: value, ...(field === 'product_id' ? { batch_id: '' } : {}) } : it);
     setOrder(o => ({ ...o, items }));
@@ -69,7 +169,7 @@ export default function SalesPage() {
     setOrder(o => ({ ...o, items: o.items.filter((_, i) => i !== idx) }));
   };
 
-  // ── Live price preview per line (with 5% GST) ────────
+  // ── Live price preview per line (new order) ────────────
   const GST_RATE = 5.0;
   const linePreview = (item) => {
     if (!item.product_id || !item.quantity_sold) return null;
@@ -78,9 +178,9 @@ export default function SalesPage() {
     let unitPrice;
     if (item.applied_price_type === 'manual') {
       unitPrice = parseFloat(item.manual_price || 0);
-      if (!unitPrice) return null; // Can't preview without a manual price
+      if (!unitPrice) return null;
     } else {
-      unitPrice = product[item.applied_price_type] || product.price; // fallback to generic price if tier is 0
+      unitPrice = product[item.applied_price_type] || product.price;
       if (item.applied_price_type === 'mrp' && item.batch_id) {
         const b = batches.find(b => b.id == item.batch_id);
         if (b && b.mrp) unitPrice = b.mrp;
@@ -96,19 +196,11 @@ export default function SalesPage() {
     return { unitPrice, discountedPrice, subtotal, gstAmount, total, discount, bonus, qty };
   };
 
-  const orderTotal = order.items.reduce((sum, it) => {
-    const p = linePreview(it);
-    return sum + (p ? p.total : 0);
-  }, 0);
-
-  const orderSubtotal = order.items.reduce((sum, it) => {
-    const p = linePreview(it);
-    return sum + (p ? p.subtotal : 0);
-  }, 0);
-
+  const orderTotal = order.items.reduce((sum, it) => { const p = linePreview(it); return sum + (p ? p.total : 0); }, 0);
+  const orderSubtotal = order.items.reduce((sum, it) => { const p = linePreview(it); return sum + (p ? p.subtotal : 0); }, 0);
   const orderGst = orderSubtotal * (GST_RATE / 100);
 
-  // ── Submit ─────────────────────────────────────────────
+  // ── Submit new order ────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
     const empId = canManage ? parseInt(order.employee_id) : user.employee_id;
@@ -121,7 +213,6 @@ export default function SalesPage() {
       if (!it.quantity_sold || parseInt(it.quantity_sold) <= 0) { toast.error(`Line ${i + 1}: Enter a valid quantity.`); return; }
       if (it.applied_price_type === 'manual' && (!it.manual_price || parseFloat(it.manual_price) <= 0)) { toast.error(`Line ${i + 1}: Enter a valid manual price.`); return; }
     }
-
     setSubmitting(true);
     try {
       const payload = {
@@ -151,7 +242,7 @@ export default function SalesPage() {
     }
   };
 
-  // ── Group sales by sale_order_id for table display ────
+  // ── Group sales by sale_order_id ───────────────────────
   const groupedSales = (() => {
     const groups = [];
     const seen = new Set();
@@ -167,6 +258,10 @@ export default function SalesPage() {
     }
     return groups;
   })();
+
+  // Batches for edit modal filtered by current sale product
+  const editBatches = editSale ? batches.filter(b => b.product_id === editSale.product_id && b.status === 'active') : [];
+  const ep = editPreview();
 
   return (
     <div className="space-y-6">
@@ -189,15 +284,16 @@ export default function SalesPage() {
               <th className="px-4 py-3 text-right">Qty</th>
               <th className="px-4 py-3 text-right">Discount</th>
               <th className="px-4 py-3 text-right">Amount</th>
-              <th className="px-4 py-3 text-right">Invoice</th>
+              <th className="px-4 py-3 text-right">Actions</th>
             </tr></thead>
             <tbody>
-              {groupedSales.map((group, gi) => {
+              {groupedSales.map((group) => {
                 if (group.isGroup) {
                   const first = group.lines[0];
                   const groupTotal = group.lines.reduce((s, x) => s + x.total_amount, 0);
+                  const canDeleteGroup = canManage || group.lines.every(l => l.employee_id === user?.employee_id);
                   return [
-                    // Order header row
+                    // ── Grouped order header row ──
                     <tr key={`hdr-${group.order_id}`} className="bg-[#E3EFEF]/60 border-b border-[#D5E5E4]">
                       <td className="px-4 py-2" colSpan={2}>
                         <span className="text-xs font-mono text-[#14A89C] font-semibold">{group.order_id}</span>
@@ -210,14 +306,22 @@ export default function SalesPage() {
                         </span>
                       </td>
                       <td className="px-4 py-2 text-xs text-gray-500">{group.lines.length} products</td>
-                      <td />
-                      <td />
-                      <td />
+                      <td /><td /><td />
                       <td className="px-4 py-2 text-right text-sm font-bold text-emerald-500">₹{groupTotal.toLocaleString()}</td>
-                      <td />
+                      <td className="px-4 py-2 text-right">
+                        {canDeleteGroup && (
+                          <button
+                            onClick={() => handleDeleteOrder(group.order_id)}
+                            className="p-1.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all"
+                            title="Delete entire order"
+                          >
+                            <HiOutlineTrash className="w-4 h-4" />
+                          </button>
+                        )}
+                      </td>
                     </tr>,
-                    // Line item rows
-                    ...group.lines.map((s, li) => (
+                    // ── Grouped line item rows ──
+                    ...group.lines.map((s) => (
                       <tr key={s.id} className="table-row border-l-4 border-l-[#14A89C]/20">
                         <td className="px-4 py-2 pl-8">
                           <span className="text-xs font-mono text-gray-500">{s.invoice_number}</span>
@@ -235,9 +339,21 @@ export default function SalesPage() {
                         </td>
                         <td className="px-4 py-2 text-right text-sm font-semibold text-emerald-400">₹{s.total_amount?.toLocaleString()}</td>
                         <td className="px-4 py-2 text-right">
-                          <button onClick={() => downloadInvoice(s.id, s.invoice_number)} className="p-1.5 rounded text-gray-400 hover:text-primary-400 transition-all" title="Download Invoice">
-                            <HiOutlineDownload className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-center justify-end gap-1">
+                            <button onClick={() => downloadInvoice(s.id, s.invoice_number)} className="p-1.5 rounded text-gray-400 hover:text-primary-400 transition-all" title="Download Invoice">
+                              <HiOutlineDownload className="w-4 h-4" />
+                            </button>
+                            {canEditSale(s) && (
+                              <>
+                                <button onClick={() => openEdit(s)} className="p-1.5 rounded text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-all" title="Edit sale">
+                                  <HiOutlinePencil className="w-4 h-4" />
+                                </button>
+                                <button onClick={() => handleDeleteSale(s.id)} className="p-1.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all" title="Delete sale">
+                                  <HiOutlineTrash className="w-4 h-4" />
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -269,9 +385,21 @@ export default function SalesPage() {
                       </td>
                       <td className="px-4 py-3 text-right font-semibold text-emerald-400">₹{s.total_amount?.toLocaleString()}</td>
                       <td className="px-4 py-3 text-right">
-                        <button onClick={() => downloadInvoice(s.id, s.invoice_number)} className="p-1.5 rounded text-gray-400 hover:text-primary-400 transition-all" title="Download Invoice">
-                          <HiOutlineDownload className="w-5 h-5" />
-                        </button>
+                        <div className="flex items-center justify-end gap-1">
+                          <button onClick={() => downloadInvoice(s.id, s.invoice_number)} className="p-1.5 rounded text-gray-400 hover:text-primary-400 transition-all" title="Download Invoice">
+                            <HiOutlineDownload className="w-5 h-5" />
+                          </button>
+                          {canEditSale(s) && (
+                            <>
+                              <button onClick={() => openEdit(s)} className="p-1.5 rounded text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-all" title="Edit sale">
+                                <HiOutlinePencil className="w-4 h-4" />
+                              </button>
+                              <button onClick={() => handleDeleteSale(s.id)} className="p-1.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all" title="Delete sale">
+                                <HiOutlineTrash className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -283,7 +411,156 @@ export default function SalesPage() {
         </div>
       )}
 
-      {/* ── Multi-Product Order Modal ───────────────────── */}
+      {/* ── Edit Sale Modal ────────────────────────────── */}
+      {editSale && createPortal(
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, backgroundColor: 'rgba(10,55,58,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ width: '100%', maxWidth: '36rem', background: '#FFFFFF', border: '1px solid #E1ECEB', borderRadius: '1rem', padding: '1.5rem', boxShadow: '0 25px 50px rgba(10,55,58,0.15)' }}>
+
+            {/* Header */}
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h2 className="text-lg font-bold text-[#1A3D40]">Edit Sale</h2>
+                <p className="text-xs text-[#4A6D71] mt-0.5 font-mono">{editSale.invoice_number}</p>
+              </div>
+              <button onClick={closeEdit} className="text-[#4A6D71] hover:text-[#0A373A]"><HiOutlineX className="w-5 h-5" /></button>
+            </div>
+
+            {/* Read-only info banner */}
+            <div className="bg-[#F0F6F6] border border-[#E1ECEB] rounded-xl p-3 mb-5 space-y-1.5">
+              <p className="text-xs font-bold text-[#4A6D71] uppercase tracking-widest mb-2">Sale Details (read-only)</p>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                <span className="text-[#4A6D71]">Product</span>
+                <span className="font-semibold text-[#0A373A]">{editSale.product_name}</span>
+                <span className="text-[#4A6D71]">Employee</span>
+                <span className="font-semibold text-[#0A373A]">{editSale.employee_name || `#${editSale.employee_id}`}</span>
+                <span className="text-[#4A6D71]">Channel</span>
+                <span className="font-semibold text-[#0A373A] capitalize">
+                  {editSale.sale_type === 'doctor' ? `Doctor — ${editSale.doctor_name}` : `Stockist — ${editSale.stockist_name}`}
+                </span>
+                <span className="text-[#4A6D71]">Date</span>
+                <span className="font-semibold text-[#0A373A]">{editSale.date ? new Date(editSale.date).toLocaleDateString() : '—'}</span>
+              </div>
+            </div>
+
+            {/* Editable form */}
+            <form onSubmit={handleEditSubmit} className="space-y-4">
+
+              {/* Batch & Price Tier */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-[#4A6D71] mb-1">Batch</label>
+                  <select
+                    value={editForm.batch_id}
+                    onChange={e => setEditForm(f => ({ ...f, batch_id: e.target.value }))}
+                    className="select-field text-sm"
+                    disabled={editBatches.length === 0}
+                  >
+                    <option value="">No batch</option>
+                    {editBatches.map(b => <option key={b.id} value={b.id}>{b.batch_number}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#4A6D71] mb-1">Price Tier</label>
+                  <select
+                    value={editForm.applied_price_type}
+                    onChange={e => setEditForm(f => ({ ...f, applied_price_type: e.target.value }))}
+                    className="select-field text-sm font-semibold"
+                  >
+                    <option value="mrp">MRP</option>
+                    <option value="pts">PTS</option>
+                    <option value="ptr">PTR</option>
+                    {editSale.sale_type === 'doctor' && <option value="manual">Manual</option>}
+                  </select>
+                </div>
+              </div>
+
+              {/* Manual price (if selected) */}
+              {editForm.applied_price_type === 'manual' && (
+                <div className="animate-fade-in">
+                  <label className="block text-xs font-semibold text-[#4A6D71] mb-1">Manual Price (₹/unit) *</label>
+                  <input
+                    type="number" min="0" step="0.01"
+                    value={editForm.manual_price}
+                    onChange={e => setEditForm(f => ({ ...f, manual_price: e.target.value }))}
+                    className="input-field text-sm"
+                    placeholder="Enter price per unit"
+                    required
+                  />
+                </div>
+              )}
+
+              {/* Qty, Bonus, Discount */}
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-[#4A6D71] mb-1">Quantity *</label>
+                  <input
+                    type="number" min="1"
+                    value={editForm.quantity_sold}
+                    onChange={e => setEditForm(f => ({ ...f, quantity_sold: e.target.value }))}
+                    className="input-field text-sm text-center"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#4A6D71] mb-1">Free Units</label>
+                  <input
+                    type="number" min="0"
+                    value={editForm.bonus_quantity}
+                    onChange={e => setEditForm(f => ({ ...f, bonus_quantity: e.target.value }))}
+                    className="input-field text-sm text-center"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#4A6D71] mb-1">Discount %</label>
+                  <input
+                    type="number" min="0" max="100" step="0.5"
+                    value={editForm.discount_percentage}
+                    onChange={e => setEditForm(f => ({ ...f, discount_percentage: e.target.value }))}
+                    className="input-field text-sm text-center"
+                  />
+                </div>
+              </div>
+
+              {/* Live total preview */}
+              {ep && (
+                <div className="bg-gradient-to-r from-[#0A373A] to-[#14A89C] rounded-xl p-4 text-white space-y-1.5">
+                  <p className="text-xs text-white/70 font-semibold uppercase tracking-widest mb-2">Updated Total Preview</p>
+                  <div className="flex justify-between text-sm text-white/80">
+                    <span>Unit price</span><span>₹{ep.unitPrice?.toFixed(2)}</span>
+                  </div>
+                  {ep.discount > 0 && (
+                    <div className="flex justify-between text-sm text-amber-200">
+                      <span>Discount ({ep.discount}%)</span><span>-₹{(ep.unitPrice * ep.discount / 100).toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-sm text-white/80">
+                    <span>Subtotal ({ep.qty} units)</span><span>₹{ep.subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-orange-200">
+                    <span>GST @ {ep.gst}%</span><span>₹{(ep.subtotal * ep.gst / 100).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-base font-bold border-t border-white/20 pt-2">
+                    <span>New Total</span><span>₹{ep.total.toFixed(2)}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-1">
+                <button type="submit" disabled={editSubmitting} className="btn-primary flex-1 !py-3">
+                  {editSubmitting ? (
+                    <span className="flex items-center justify-center gap-2"><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving...</span>
+                  ) : 'Save Changes'}
+                </button>
+                <button type="button" onClick={closeEdit} className="btn-secondary">Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ── New Order Modal ────────────────────────────── */}
       {showModal && createPortal(
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, backgroundColor: 'rgba(10,55,58,0.45)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '1rem', overflowY: 'auto' }}>
           <div style={{ width: '100%', maxWidth: '52rem', marginTop: '2rem', marginBottom: '2rem', background: '#FFFFFF', border: '1px solid #E1ECEB', borderRadius: '1rem', padding: '1.5rem', boxShadow: '0 25px 50px rgba(10,55,58,0.12)' }}>
@@ -299,10 +576,9 @@ export default function SalesPage() {
 
             <form onSubmit={handleSubmit} className="space-y-5">
 
-              {/* ── ORDER HEADER: Employee + Type + Party ── */}
+              {/* ORDER HEADER */}
               <div className="bg-[#F0F6F6] rounded-xl p-4 border border-[#E1ECEB] space-y-3">
                 <p className="text-xs font-bold text-[#4A6D71] uppercase tracking-widest">Order Details</p>
-
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                   {canManage && (
                     <div>
@@ -318,18 +594,12 @@ export default function SalesPage() {
                     <label className="block text-xs text-[#4A6D71] font-semibold mb-1">Sale Channel *</label>
                     <div className="flex gap-2">
                       <button type="button"
-                        onClick={() => {
-                          setOrder(o => ({ ...o, sale_type: 'stockist', doctor_id: '' }));
-                          setDoctorSearch('');
-                        }}
+                        onClick={() => { setOrder(o => ({ ...o, sale_type: 'stockist', doctor_id: '' })); setDoctorSearch(''); }}
                         className={`flex-1 py-2 rounded-lg text-xs font-bold border transition-all ${order.sale_type === 'stockist' ? 'bg-blue-500/20 text-blue-600 border-blue-500/40' : 'bg-white text-[#4A6D71] border-[#D5E5E4]'}`}>
                         🏪 Stockist
                       </button>
                       <button type="button"
-                        onClick={() => {
-                          setOrder(o => ({ ...o, sale_type: 'doctor', stockist_id: '' }));
-                          setDoctorSearch('');
-                        }}
+                        onClick={() => { setOrder(o => ({ ...o, sale_type: 'doctor', stockist_id: '' })); setDoctorSearch(''); }}
                         className={`flex-1 py-2 rounded-lg text-xs font-bold border transition-all ${order.sale_type === 'doctor' ? 'bg-purple-500/20 text-purple-600 border-purple-500/40' : 'bg-white text-[#4A6D71] border-[#D5E5E4]'}`}>
                         👨‍⚕️ Doctor
                       </button>
@@ -345,76 +615,42 @@ export default function SalesPage() {
                       </select>
                     ) : (
                       <div className="relative">
-                        <input 
-                          type="text" 
-                          placeholder="Type to search doctor..." 
+                        <input
+                          type="text"
+                          placeholder="Type to search doctor..."
                           value={doctorSearch}
                           onFocus={() => setShowDoctorDropdown(true)}
                           onChange={e => {
                             setDoctorSearch(e.target.value);
                             setShowDoctorDropdown(true);
-                            if (!e.target.value) {
-                              setOrder(o => ({ ...o, doctor_id: '' }));
-                            }
+                            if (!e.target.value) setOrder(o => ({ ...o, doctor_id: '' }));
                           }}
                           className="input-field pr-10 text-sm"
                           required={!order.doctor_id}
                         />
-                        
                         {doctorSearch && (
-                          <button 
-                            type="button" 
-                            onClick={() => {
-                              setOrder(o => ({ ...o, doctor_id: '' }));
-                              setDoctorSearch('');
-                              setShowDoctorDropdown(true);
-                            }}
-                            className="absolute right-8 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs animate-fade-in"
-                          >
-                            ✕
-                          </button>
+                          <button type="button" onClick={() => { setOrder(o => ({ ...o, doctor_id: '' })); setDoctorSearch(''); setShowDoctorDropdown(true); }}
+                            className="absolute right-8 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">✕</button>
                         )}
-
-                        <button 
-                          type="button" 
-                          onClick={() => setShowDoctorDropdown(!showDoctorDropdown)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#4A6D71] hover:text-[#0A373A] text-xs"
-                        >
+                        <button type="button" onClick={() => setShowDoctorDropdown(!showDoctorDropdown)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#4A6D71] hover:text-[#0A373A] text-xs">
                           {showDoctorDropdown ? '▲' : '▼'}
                         </button>
-
                         {showDoctorDropdown && (
                           <>
-                            <div 
-                              className="fixed inset-0 z-40 bg-transparent" 
-                              onClick={() => {
-                                setShowDoctorDropdown(false);
-                                const currentDoc = doctors.find(d => d.id == order.doctor_id);
-                                setDoctorSearch(currentDoc ? `Dr. ${currentDoc.name}` : '');
-                              }}
-                            />
-                            
+                            <div className="fixed inset-0 z-40 bg-transparent" onClick={() => { setShowDoctorDropdown(false); const d = doctors.find(d => d.id == order.doctor_id); setDoctorSearch(d ? `Dr. ${d.name}` : ''); }} />
                             <div className="absolute z-50 left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-white border border-[#E1ECEB] rounded-xl shadow-xl divide-y divide-[#E1ECEB]">
                               {(() => {
-                                const filtered = doctors.filter(d => 
+                                const filtered = doctors.filter(d =>
                                   d.name.toLowerCase().includes(doctorSearch.toLowerCase()) ||
                                   (d.specialization && d.specialization.toLowerCase().includes(doctorSearch.toLowerCase())) ||
                                   (d.hospital && d.hospital.toLowerCase().includes(doctorSearch.toLowerCase()))
                                 );
-                                if (filtered.length === 0) {
-                                  return <div className="p-3 text-sm text-gray-500 text-center">No doctors found</div>;
-                                }
+                                if (filtered.length === 0) return <div className="p-3 text-sm text-gray-500 text-center">No doctors found</div>;
                                 return filtered.map(d => (
-                                  <button 
-                                    key={d.id}
-                                    type="button"
-                                    onClick={() => {
-                                      setOrder(o => ({ ...o, doctor_id: d.id.toString() }));
-                                      setDoctorSearch(`Dr. ${d.name}`);
-                                      setShowDoctorDropdown(false);
-                                    }}
-                                    className={`w-full text-left px-4 py-2.5 text-sm hover:bg-[#F0F6F6] transition-colors ${order.doctor_id == d.id ? 'bg-[#E3EFEF] text-[#0A373A] font-semibold' : 'text-[#1A3D40]'}`}
-                                  >
+                                  <button key={d.id} type="button"
+                                    onClick={() => { setOrder(o => ({ ...o, doctor_id: d.id.toString() })); setDoctorSearch(`Dr. ${d.name}`); setShowDoctorDropdown(false); }}
+                                    className={`w-full text-left px-4 py-2.5 text-sm hover:bg-[#F0F6F6] transition-colors ${order.doctor_id == d.id ? 'bg-[#E3EFEF] text-[#0A373A] font-semibold' : 'text-[#1A3D40]'}`}>
                                     <div className="font-medium">Dr. {d.name}</div>
                                     <div className="text-[10px] text-gray-500 mt-0.5">{d.specialization || 'Clinic'}{d.hospital ? ` — ${d.hospital}` : ''}</div>
                                   </button>
@@ -429,14 +665,13 @@ export default function SalesPage() {
                 </div>
               </div>
 
-              {/* ── PRODUCT LINES ── */}
+              {/* PRODUCT LINES */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-bold text-[#4A6D71] uppercase tracking-widest">Product Lines</p>
                   <span className="text-xs text-[#14A89C] font-semibold bg-[#E3EFEF] px-2 py-0.5 rounded-full">{order.items.length} item(s)</span>
                 </div>
 
-                {/* Column headers (hidden on mobile, grid on desktop) */}
                 <div className="hidden sm:grid gap-2 text-xs font-semibold text-[#4A6D71] uppercase tracking-wide px-1" style={{ gridTemplateColumns: '2fr 1fr 1.2fr 0.7fr 0.7fr 0.7fr 1fr 1.5rem' }}>
                   <span>Product</span><span>Price Tier</span><span>Batch</span><span>Qty</span><span>Free</span><span>Disc%</span><span className="text-right">Line Total</span><span />
                 </div>
@@ -446,46 +681,35 @@ export default function SalesPage() {
                   const filteredBatches = batches.filter(b => b.product_id == item.product_id && b.status === 'active');
                   return (
                     <div key={idx} className="border border-[#E1ECEB] rounded-xl p-3 bg-white space-y-2">
-                      
-                      {/* Desktop layout: visible only on sm screens and up */}
                       <div className="hidden sm:grid gap-2 items-center" style={{ gridTemplateColumns: '2fr 1fr 1.2fr 0.7fr 0.7fr 0.7fr 1fr 1.5rem' }}>
-                        {/* Product */}
                         <select value={item.product_id} onChange={e => updateItem(idx, 'product_id', e.target.value)} className="select-field text-sm" required>
                           <option value="">Select product</option>
                           {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                         </select>
-                        {/* Price Type */}
                         <select value={item.applied_price_type} onChange={e => updateItem(idx, 'applied_price_type', e.target.value)} className="select-field text-sm font-semibold" required>
                           <option value="mrp">MRP</option>
                           <option value="pts">PTS</option>
                           <option value="ptr">PTR</option>
                           {order.sale_type === 'doctor' && <option value="manual">Manual</option>}
                         </select>
-                        {/* Batch */}
                         <select value={item.batch_id} onChange={e => updateItem(idx, 'batch_id', e.target.value)} className="select-field text-sm" disabled={!item.product_id || filteredBatches.length === 0}>
                           <option value="">No batch</option>
                           {filteredBatches.map(b => <option key={b.id} value={b.id}>{b.batch_number}</option>)}
                         </select>
-                        {/* Qty */}
                         <input type="number" min="1" value={item.quantity_sold} onChange={e => updateItem(idx, 'quantity_sold', e.target.value)} className="input-field text-sm text-center" placeholder="Qty" required />
-                        {/* Free */}
                         <input type="number" min="0" value={item.bonus_quantity} onChange={e => updateItem(idx, 'bonus_quantity', e.target.value)} className="input-field text-sm text-center" placeholder="0" />
-                        {/* Discount */}
                         <input type="number" min="0" max="100" step="0.5" value={item.discount_percentage} onChange={e => updateItem(idx, 'discount_percentage', e.target.value)} className="input-field text-sm text-center" placeholder="0" />
-                        {/* Line total */}
                         <div className="text-right text-sm font-semibold text-emerald-600">
                           {prev ? `₹${prev.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
                         </div>
-                        {/* Remove button */}
                         <button type="button" onClick={() => removeLine(idx)} disabled={order.items.length === 1}
                           className="text-gray-300 hover:text-red-500 disabled:opacity-20 disabled:cursor-not-allowed transition-colors">
                           <HiOutlineTrash className="w-4 h-4" />
                         </button>
                       </div>
 
-                      {/* Mobile layout: visible only on screens smaller than sm */}
+                      {/* Mobile layout */}
                       <div className="flex flex-col gap-3 sm:hidden">
-                        {/* Row 1: Product Selection */}
                         <div>
                           <label className="block text-[10px] font-bold text-[#4A6D71] uppercase tracking-wider mb-1">Product *</label>
                           <select value={item.product_id} onChange={e => updateItem(idx, 'product_id', e.target.value)} className="select-field text-sm" required>
@@ -493,15 +717,11 @@ export default function SalesPage() {
                             {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                           </select>
                         </div>
-
-                        {/* Row 2: Price Tier & Batch */}
                         <div className="grid grid-cols-2 gap-2">
                           <div>
                             <label className="block text-[10px] font-bold text-[#4A6D71] uppercase tracking-wider mb-1">Price Tier *</label>
                             <select value={item.applied_price_type} onChange={e => updateItem(idx, 'applied_price_type', e.target.value)} className="select-field text-sm font-semibold" required>
-                              <option value="mrp">MRP</option>
-                              <option value="pts">PTS</option>
-                              <option value="ptr">PTR</option>
+                              <option value="mrp">MRP</option><option value="pts">PTS</option><option value="ptr">PTR</option>
                               {order.sale_type === 'doctor' && <option value="manual">Manual</option>}
                             </select>
                           </div>
@@ -513,8 +733,6 @@ export default function SalesPage() {
                             </select>
                           </div>
                         </div>
-
-                        {/* Row 3: Qty, Free, Disc% */}
                         <div className="grid grid-cols-3 gap-2">
                           <div>
                             <label className="block text-[10px] font-bold text-[#4A6D71] uppercase tracking-wider mb-1">Qty *</label>
@@ -529,8 +747,6 @@ export default function SalesPage() {
                             <input type="number" min="0" max="100" step="0.5" value={item.discount_percentage} onChange={e => updateItem(idx, 'discount_percentage', e.target.value)} className="input-field text-sm text-center" placeholder="0" />
                           </div>
                         </div>
-
-                        {/* Row 4: Line Total & Remove button */}
                         <div className="flex items-center justify-between border-t border-[#E1ECEB] pt-2">
                           <div className="flex items-center gap-1.5">
                             <span className="text-xs text-[#4A6D71] font-semibold">Line Total:</span>
@@ -545,18 +761,11 @@ export default function SalesPage() {
                         </div>
                       </div>
 
-                      {/* Manual price row — shown below grid, never breaks column layout */}
+                      {/* Manual price row */}
                       {item.applied_price_type === 'manual' && (
                         <div className="flex items-center gap-3 px-1 pt-0.5">
                           <label className="text-xs font-semibold text-[#4A6D71] whitespace-nowrap">💰 Manual Price (₹/unit)</label>
-                          <input
-                            type="number" min="0" step="0.01"
-                            value={item.manual_price}
-                            onChange={e => updateItem(idx, 'manual_price', e.target.value)}
-                            className="input-field text-sm w-40"
-                            placeholder="Enter price per unit"
-                            required
-                          />
+                          <input type="number" min="0" step="0.01" value={item.manual_price} onChange={e => updateItem(idx, 'manual_price', e.target.value)} className="input-field text-sm w-40" placeholder="Enter price per unit" required />
                           {item.manual_price && parseFloat(item.manual_price) > 0 && (
                             <span className="text-xs text-[#14A89C] font-semibold">₹{parseFloat(item.manual_price).toFixed(2)}/unit</span>
                           )}
@@ -582,7 +791,7 @@ export default function SalesPage() {
                 </button>
               </div>
 
-              {/* ── ORDER TOTAL with GST breakdown ── */}
+              {/* ORDER TOTAL */}
               <div className="bg-gradient-to-r from-[#0A373A] to-[#14A89C] rounded-xl p-4 text-white space-y-2">
                 <p className="text-xs text-white/70 font-semibold uppercase tracking-widest mb-2">Order Summary</p>
                 <div className="flex justify-between text-sm text-white/80">
@@ -599,7 +808,7 @@ export default function SalesPage() {
                 </div>
               </div>
 
-              {/* ── Actions ── */}
+              {/* Actions */}
               <div className="flex gap-3 pt-1">
                 <button type="submit" disabled={submitting} className="btn-primary flex-1 !py-3">
                   {submitting ? (

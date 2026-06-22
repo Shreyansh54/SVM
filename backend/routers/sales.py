@@ -329,6 +329,109 @@ def get_monthly_sales(
     return list(monthly.values())
 
 
+@router.put("/{sale_id}", response_model=schemas.SaleOut)
+def update_sale(
+    sale_id: int,
+    update: schemas.SaleUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Edit quantity, bonus, discount, batch, or price tier of an existing sale.
+    Product, employee, channel (stockist/doctor) are immutable.
+    Stock is automatically adjusted for stockist sales."""
+    sale = db.query(models.Sale).filter(models.Sale.id == sale_id).first()
+    if not sale:
+        raise HTTPException(status_code=404, detail="Sale record not found")
+
+    # Permission check
+    if current_user.role == "employee" and sale.employee_id != current_user.employee_id:
+        raise HTTPException(status_code=403, detail="You do not have permission to edit this sale record")
+
+    sale_type = sale.sale_type or "stockist"
+
+    # ── For stockist sales: restore old stock before applying new values ──
+    old_stock = None
+    if sale_type == "stockist" and sale.stockist_id:
+        sq = db.query(models.Stock).filter(
+            models.Stock.stockist_id == sale.stockist_id,
+            models.Stock.product_id == sale.product_id
+        )
+        if sale.batch_id:
+            sq = sq.filter(models.Stock.batch_id == sale.batch_id)
+        old_stock = sq.first()
+        if old_stock:
+            old_stock.quantity += (sale.quantity_sold + (sale.bonus_quantity or 0))
+
+    # ── Apply updates ──
+    new_qty      = update.quantity_sold     if update.quantity_sold     is not None else sale.quantity_sold
+    new_bonus    = update.bonus_quantity    if update.bonus_quantity    is not None else (sale.bonus_quantity or 0)
+    new_discount = update.discount_percentage if update.discount_percentage is not None else (sale.discount_percentage or 0.0)
+    new_batch_id = update.batch_id          if update.batch_id          is not None else sale.batch_id
+    new_price_type = update.applied_price_type if update.applied_price_type is not None else "mrp"
+    new_manual_price = update.manual_price  if update.manual_price      is not None else None
+
+    if new_qty <= 0:
+        raise HTTPException(status_code=400, detail="quantity_sold must be greater than 0")
+
+    # Resolve batch
+    batch = None
+    if new_batch_id:
+        batch = db.query(models.Batch).filter(models.Batch.id == new_batch_id).first()
+        if not batch:
+            raise HTTPException(status_code=404, detail="Batch not found")
+        if batch.status == "recalled":
+            raise HTTPException(status_code=400, detail="Cannot use a recalled batch")
+        if batch.status == "expired":
+            raise HTTPException(status_code=400, detail="Cannot use an expired batch")
+
+    # ── For stockist sales: check and deduct new stock ──
+    if sale_type == "stockist" and sale.stockist_id:
+        # If batch changed, find new stock entry
+        if new_batch_id != sale.batch_id:
+            sq = db.query(models.Stock).filter(
+                models.Stock.stockist_id == sale.stockist_id,
+                models.Stock.product_id == sale.product_id
+            )
+            if new_batch_id:
+                sq = sq.filter(models.Stock.batch_id == new_batch_id)
+            new_stock = sq.first()
+        else:
+            new_stock = old_stock  # same entry, already restored above
+
+        need = new_qty + new_bonus
+        if not new_stock or new_stock.quantity < need:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Insufficient stock (need {need}, have {new_stock.quantity if new_stock else 0})"
+            )
+        new_stock.quantity -= need
+
+    # ── Recalculate total ──
+    product = db.query(models.Product).filter(models.Product.id == sale.product_id).first()
+    if new_price_type == "manual" and new_manual_price is not None:
+        unit_price = new_manual_price
+    elif new_price_type == "mrp" and batch:
+        unit_price = batch.mrp
+    else:
+        unit_price = getattr(product, new_price_type, product.price)
+
+    discount = max(0.0, min(100.0, new_discount))
+    discounted_price = unit_price * (1 - discount / 100)
+    gst_rate = sale.gst_rate if sale.gst_rate is not None else 5.0
+    total_amount = round(new_qty * discounted_price * (1 + gst_rate / 100), 2)
+
+    # ── Persist changes ──
+    sale.quantity_sold       = new_qty
+    sale.bonus_quantity      = new_bonus
+    sale.discount_percentage = discount
+    sale.batch_id            = new_batch_id
+    sale.total_amount        = total_amount
+
+    db.commit()
+    db.refresh(sale)
+    return sale_to_out(sale)
+
+
 @router.delete("/{sale_id}")
 def delete_sale(
     sale_id: int,

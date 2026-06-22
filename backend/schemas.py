@@ -310,6 +310,18 @@ class BulkSaleCreate(BaseModel):
     items: List[SaleLineItem]    # must have at least 1 item
 
 
+
+# ─── Sale Update ─────────────────────────────────────────
+class SaleUpdate(BaseModel):
+    """Editable fields of an existing sale. Product, employee, and channel are immutable."""
+    quantity_sold: Optional[int] = None
+    bonus_quantity: Optional[int] = None
+    discount_percentage: Optional[float] = None
+    batch_id: Optional[int] = None
+    applied_price_type: Optional[str] = None  # "mrp", "pts", "ptr", "manual"
+    manual_price: Optional[float] = None
+
+
 # ─── Attendance ──────────────────────────────────────────
 class AttendanceCreate(BaseModel):
     employee_id: int
