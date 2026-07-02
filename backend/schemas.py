@@ -308,6 +308,7 @@ class BulkSaleCreate(BaseModel):
     stockist_id: Optional[int] = None
     doctor_id: Optional[int] = None
     items: List[SaleLineItem]    # must have at least 1 item
+    sale_date: Optional[date] = None  # back-date support; defaults to today if omitted
 
 
 

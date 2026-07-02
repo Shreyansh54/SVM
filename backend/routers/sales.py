@@ -219,8 +219,10 @@ def create_bulk_sale(
         resolved.append((item, product, batch, stock))
 
     # ── All valid — generate shared order ID and create records ──
-    sale_order_id = f"ORD-{datetime.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
-    current_month = datetime.now().strftime("%Y%m")
+    # Use the caller-supplied date for back-dating, or fall back to now
+    effective_dt = datetime.combine(order.sale_date, datetime.min.time()) if order.sale_date else datetime.now()
+    sale_order_id = f"ORD-{effective_dt.strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
+    current_month = effective_dt.strftime("%Y%m")
     created_sales = []
 
     for line_num, (item, product, batch, stock) in enumerate(resolved, 1):
@@ -255,6 +257,7 @@ def create_bulk_sale(
             gst_rate=gst_rate,
             total_amount=total_amount,
             sale_order_id=sale_order_id,
+            date=effective_dt,
         )
         db.add(db_sale)
         db.flush()  # get ID
