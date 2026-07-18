@@ -281,9 +281,18 @@ def get_all_sales(
     if current_user.role == "employee":
         if not current_user.employee_id:
             return []
-        sales = db.query(models.Sale).filter(models.Sale.employee_id == current_user.employee_id).all()
+        sales = (
+            db.query(models.Sale)
+            .filter(models.Sale.employee_id == current_user.employee_id)
+            .order_by(models.Sale.date.desc(), models.Sale.id.desc())
+            .all()
+        )
     else:
-        sales = db.query(models.Sale).all()
+        sales = (
+            db.query(models.Sale)
+            .order_by(models.Sale.date.desc(), models.Sale.id.desc())
+            .all()
+        )
     return [sale_to_out(s) for s in sales]
 
 

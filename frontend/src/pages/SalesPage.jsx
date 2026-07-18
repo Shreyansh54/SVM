@@ -294,6 +294,18 @@ export default function SalesPage() {
     }
     // Sort months newest first
     const keys = Object.keys(bkts).sort((a, b) => b.localeCompare(a));
+    // Sort groups within each month newest-first by date then by id
+    for (const key of keys) {
+      bkts[key].sort((a, b) => {
+        const da = new Date(a.date || 0);
+        const db2 = new Date(b.date || 0);
+        if (db2 - da !== 0) return db2 - da;
+        // tie-break by order_id / sale id (higher = newer)
+        const aId = a.isGroup ? a.order_id : a.sale?.id ?? 0;
+        const bId = b.isGroup ? b.order_id : b.sale?.id ?? 0;
+        return String(bId).localeCompare(String(aId));
+      });
+    }
     return { monthKeys: keys, buckets: bkts };
   }, [groupedSales]);
 
