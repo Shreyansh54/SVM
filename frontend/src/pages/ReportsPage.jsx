@@ -306,12 +306,12 @@ export default function ReportsPage() {
   const currentPeriodKey = (type) => {
     const n = new Date();
     if (type === 'monthly') return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`;
-    const iso = n.toISOString().slice(0,10);
-    // ISO week number
-    const jan4 = new Date(n.getFullYear(), 0, 4);
-    const startOfYear = new Date(jan4.setDate(jan4.getDate() - jan4.getDay() + 1));
-    const weekNo = Math.ceil(((n - startOfYear) / 86400000 + 1) / 7);
-    return `${n.getFullYear()}-W${String(weekNo).padStart(2,'0')}`;
+    // ISO 8601 week — matches Python date.isocalendar()
+    const d = new Date(n); d.setHours(0,0,0,0);
+    d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
+    const week1 = new Date(d.getFullYear(), 0, 4);
+    const weekNo = 1 + Math.round(((d.getTime() - week1.getTime()) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7);
+    return `${d.getFullYear()}-W${String(weekNo).padStart(2,'0')}`;
   };
 
   const handleSetTarget = async (e) => {
@@ -345,12 +345,24 @@ export default function ReportsPage() {
   // ── Target completion for current month + week ───────
   const now = new Date();
   const thisMonthKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  const thisWeekNum  = (() => {
-    const jan4 = new Date(now.getFullYear(), 0, 4);
-    const soy  = new Date(jan4.setDate(jan4.getDate() - jan4.getDay() + 1));
-    return Math.ceil(((now - soy) / 86400000 + 1) / 7);
+
+  // Standard ISO 8601 week number — matches Python's date.isocalendar()
+  // Works by finding the nearest Thursday (ISO weeks always start on Monday,
+  // and the week that contains Thursday is week 1).
+  const { isoWeekNum, isoWeekYear } = (() => {
+    const d = new Date(now);
+    d.setHours(0, 0, 0, 0);
+    // Shift to nearest Thursday: current weekday + offset so Monday=0
+    d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
+    // Jan 4 is always in ISO week 1
+    const week1 = new Date(d.getFullYear(), 0, 4);
+    const weekNum = 1 + Math.round(
+      ((d.getTime() - week1.getTime()) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7
+    );
+    return { isoWeekNum: weekNum, isoWeekYear: d.getFullYear() };
   })();
-  const thisWeekKey  = `${now.getFullYear()}-W${String(thisWeekNum).padStart(2,'0')}`;
+  const thisWeekNum = isoWeekNum;
+  const thisWeekKey = `${isoWeekYear}-W${String(isoWeekNum).padStart(2,'0')}`;
 
   const completionRows = useMemo(() => {
     const allEmpIds = [...new Set([
