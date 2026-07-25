@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import api from '../api';
 import toast from 'react-hot-toast';
@@ -22,6 +22,21 @@ export default function DoctorsPage() {
   const [prescForm, setPrescForm] = useState({ product_id: '', notes: '' });
   const [orderForm, setOrderForm] = useState({ doctor_id: '', employee_id: '', product_id: '', quantity: 1, notes: '' });
   const [loading, setLoading] = useState(true);
+
+  // ── Live duplicate detection ────────────────────────────
+  // Runs every time the name or phone field changes (only when adding, not editing)
+  const duplicateMatch = useMemo(() => {
+    if (editing) return null;                        // skip when editing
+    const typedName = form.name.trim().toLowerCase();
+    if (!typedName) return null;
+    const match = doctors.find(d =>
+      d.name.trim().toLowerCase() === typedName
+    );
+    if (!match) return null;
+    // If both have phone numbers and they differ → different doctors, allow
+    if (form.phone && match.phone && form.phone.trim() !== match.phone.trim()) return null;
+    return match;   // confirmed duplicate
+  }, [form.name, form.phone, doctors, editing]);
 
   useEffect(() => { loadAll(); }, [isEmployee]);
 
@@ -257,15 +272,58 @@ export default function DoctorsPage() {
               <button onClick={() => setShowModal(false)} className="text-[#4A6D71] hover:text-[#0A373A]"><HiOutlineX className="w-5 h-5" /></button>
             </div>
             <form onSubmit={handleSubmitDoctor} className="space-y-4">
+              {/* Duplicate warning banner */}
+              {duplicateMatch && (
+                <div style={{
+                  background: '#FEF3C7', border: '1.5px solid #F59E0B',
+                  borderRadius: '10px', padding: '12px 14px',
+                  display: 'flex', alignItems: 'flex-start', gap: '10px'
+                }}>
+                  <span style={{ fontSize: '1.2rem', flexShrink: 0 }}>⚠️</span>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontWeight: '700', color: '#92400E', fontSize: '0.85rem', marginBottom: '2px' }}>
+                      Doctor already exists!
+                    </p>
+                    <p style={{ color: '#78350F', fontSize: '0.78rem' }}>
+                      <strong>Dr. {duplicateMatch.name}</strong>
+                      {duplicateMatch.specialization ? ` · ${duplicateMatch.specialization}` : ''}
+                      {duplicateMatch.hospital ? ` · ${duplicateMatch.hospital}` : ''}
+                      {duplicateMatch.phone ? ` · ${duplicateMatch.phone}` : ''}
+                    </p>
+                    <p style={{ color: '#92400E', fontSize: '0.75rem', marginTop: '4px' }}>
+                      Please search for them in the list instead of adding again.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
-                <div><label className="block text-sm text-gray-400 mb-1">Name</label><input value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="input-field" required /></div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Name *</label>
+                  <input
+                    value={form.name}
+                    onChange={e => setForm({...form, name: e.target.value})}
+                    className={`input-field ${duplicateMatch ? 'border-amber-400 bg-amber-50' : ''}`}
+                    required
+                    placeholder="Dr. Full Name"
+                  />
+                </div>
                 <div><label className="block text-sm text-gray-400 mb-1">Specialization</label><input value={form.specialization} onChange={e => setForm({...form, specialization: e.target.value})} className="input-field" /></div>
                 <div><label className="block text-sm text-gray-400 mb-1">Hospital</label><input value={form.hospital} onChange={e => setForm({...form, hospital: e.target.value})} className="input-field" /></div>
-                <div><label className="block text-sm text-gray-400 mb-1">Phone</label><input value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} className="input-field" /></div>
+                <div><label className="block text-sm text-gray-400 mb-1">Phone</label><input value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} className="input-field" placeholder="10-digit number" /></div>
               </div>
               <div><label className="block text-sm text-gray-400 mb-1">Location</label><input value={form.location} onChange={e => setForm({...form, location: e.target.value})} className="input-field" /></div>
               <div><label className="block text-sm text-gray-400 mb-1">GSTIN (Optional)</label><input value={form.gstin} onChange={e => setForm({...form, gstin: e.target.value})} className="input-field uppercase font-mono" placeholder="22AAAAA0000A1Z5" /></div>
-              <div className="flex gap-3 pt-2"><button type="submit" className="btn-primary flex-1">Save</button><button type="button" onClick={() => setShowModal(false)} className="btn-secondary">Cancel</button></div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={!!duplicateMatch}
+                  className="btn-primary flex-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {duplicateMatch ? '⚠️ Duplicate — Cannot Save' : 'Save'}
+                </button>
+                <button type="button" onClick={() => setShowModal(false)} className="btn-secondary">Cancel</button>
+              </div>
             </form>
           </div>
         </div>,

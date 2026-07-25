@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import List
 from database import get_db
 from auth import get_current_user, require_role
@@ -16,6 +17,30 @@ def create_doctor(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_role("admin", "manager", "employee"))
 ):
+    # ── Duplicate check ───────────────────────────────────
+    # Block if same name (case-insensitive) already exists.
+    # If a phone number is also provided, also match on phone for extra precision.
+    name_clean = doctor.name.strip().lower()
+    existing = db.query(models.Doctor).filter(
+        func.lower(models.Doctor.name) == name_clean
+    ).first()
+
+    if existing:
+        # If phone provided, only block when phone also matches (catches
+        # two different "Dr. Sharma"s at different hospitals)
+        if doctor.phone and existing.phone:
+            if doctor.phone.strip() == existing.phone.strip():
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"A doctor named '{existing.name}' with phone {existing.phone} already exists (ID #{existing.id})."
+                )
+        else:
+            # No phone to disambiguate — block on name alone
+            raise HTTPException(
+                status_code=409,
+                detail=f"A doctor named '{existing.name}' already exists (ID #{existing.id}, {existing.hospital or 'no hospital listed'})."
+            )
+
     db_doc = models.Doctor(**doctor.model_dump())
     db.add(db_doc)
     db.commit()
