@@ -249,4 +249,13 @@ class Collection(Base):
     employee = relationship("Employee")
 
 
+class SaleTarget(Base):
+    __tablename__ = "sale_targets"
 
+    id            = Column(Integer, primary_key=True, index=True)
+    employee_id   = Column(Integer, ForeignKey("employees.id", ondelete="CASCADE"), nullable=False)
+    period_type   = Column(String, nullable=False)   # "monthly" | "weekly"
+    period_key    = Column(String, nullable=False)   # "2025-07"  | "2025-W30"
+    target_amount = Column(Float, nullable=False)
+
+    employee = relationship("Employee")

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func, extract
 from typing import List
@@ -415,3 +415,219 @@ def get_birthdays(
         "today": today_birthdays,
         "upcoming": upcoming_birthdays
     }
+
+
+# ─── Employee Monthly Performance ────────────────────────
+@router.get("/employee-monthly")
+def get_employee_monthly(
+    year: int = None,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Returns monthly sales per employee for the given year (defaults to current year)."""
+    now = datetime.now()
+    target_year = year or now.year
+
+    # Base query filtered by year
+    q = db.query(
+        models.Sale.employee_id,
+        models.Employee.name,
+        extract('year',  models.Sale.date).label('yr'),
+        extract('month', models.Sale.date).label('mo'),
+        func.sum(models.Sale.total_amount).label('total'),
+        func.count(models.Sale.id).label('cnt')
+    ).join(
+        models.Employee, models.Sale.employee_id == models.Employee.id
+    ).filter(
+        extract('year', models.Sale.date) == target_year
+    )
+
+    # Employees see only their own data
+    if current_user.role == 'employee' and current_user.employee_id:
+        q = q.filter(models.Sale.employee_id == current_user.employee_id)
+
+    rows = q.group_by(
+        models.Sale.employee_id, models.Employee.name,
+        extract('year', models.Sale.date), extract('month', models.Sale.date)
+    ).order_by(
+        extract('month', models.Sale.date), models.Employee.name
+    ).all()
+
+    # Load all monthly targets for this year
+    tq = db.query(models.SaleTarget).filter(
+        models.SaleTarget.period_type == 'monthly',
+        models.SaleTarget.period_key.like(f'{target_year}-%')
+    )
+    if current_user.role == 'employee' and current_user.employee_id:
+        tq = tq.filter(models.SaleTarget.employee_id == current_user.employee_id)
+    targets = {(t.employee_id, t.period_key): t.target_amount for t in tq.all()}
+
+    result = []
+    for r in rows:
+        period_key = f'{int(r.yr):04d}-{int(r.mo):02d}'
+        result.append({
+            'employee_id':   r[0],
+            'employee_name': r[1],
+            'period_key':    period_key,
+            'total_amount':  float(r.total),
+            'order_count':   int(r.cnt),
+            'target_amount': targets.get((r[0], period_key))
+        })
+    return result
+
+
+# ─── Employee Weekly Performance ─────────────────────────
+@router.get("/employee-weekly")
+def get_employee_weekly(
+    weeks: int = 8,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Returns sales per employee for the last N ISO weeks (default 8)."""
+    from datetime import date as date_type
+    import math
+
+    today = date_type.today()
+    # Start from beginning of (today - weeks) ISO week
+    start = today - timedelta(weeks=weeks)
+    # Round to Monday of that week
+    start = start - timedelta(days=start.weekday())
+
+    q = db.query(
+        models.Sale.employee_id,
+        models.Employee.name,
+        models.Sale.date,
+        models.Sale.total_amount,
+        models.Sale.id
+    ).join(
+        models.Employee, models.Sale.employee_id == models.Employee.id
+    ).filter(
+        models.Sale.date >= start
+    )
+    if current_user.role == 'employee' and current_user.employee_id:
+        q = q.filter(models.Sale.employee_id == current_user.employee_id)
+
+    sales_rows = q.all()
+
+    # Aggregate client-side by ISO week
+    from collections import defaultdict
+    agg = defaultdict(lambda: {'total': 0.0, 'cnt': 0, 'emp_name': ''})
+    for row in sales_rows:
+        d = row.date if hasattr(row.date, 'isocalendar') else row.date.date()
+        iso = d.isocalendar()
+        period_key = f'{iso[0]}-W{iso[1]:02d}'
+        key = (row[0], period_key)
+        agg[key]['total']    += float(row[3])
+        agg[key]['cnt']      += 1
+        agg[key]['emp_name']  = row[1]
+
+    # Load weekly targets
+    tq = db.query(models.SaleTarget).filter(models.SaleTarget.period_type == 'weekly')
+    if current_user.role == 'employee' and current_user.employee_id:
+        tq = tq.filter(models.SaleTarget.employee_id == current_user.employee_id)
+    targets = {(t.employee_id, t.period_key): t.target_amount for t in tq.all()}
+
+    # Build week labels: "Week 30 (Jul 21-27 2025)"
+    def week_label(period_key):
+        yr, wk = period_key.split('-W')
+        # Monday of that ISO week
+        monday = date_type.fromisocalendar(int(yr), int(wk), 1)
+        sunday = monday + timedelta(days=6)
+        months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+        return f"W{wk} ({months[monday.month-1]} {monday.day}-{sunday.day})"
+
+    result = []
+    for (emp_id, period_key), data in sorted(agg.items(), key=lambda x: (x[0][1], x[0][0])):
+        result.append({
+            'employee_id':   emp_id,
+            'employee_name': data['emp_name'],
+            'period_key':    period_key,
+            'week_label':    week_label(period_key),
+            'total_amount':  data['total'],
+            'order_count':   data['cnt'],
+            'target_amount': targets.get((emp_id, period_key))
+        })
+    return result
+
+
+# ─── Targets CRUD ─────────────────────────────────────────
+@router.get("/targets")
+def get_targets(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    q = db.query(models.SaleTarget)
+    if current_user.role == 'employee' and current_user.employee_id:
+        q = q.filter(models.SaleTarget.employee_id == current_user.employee_id)
+    targets = q.all()
+    return [
+        {
+            'id':            t.id,
+            'employee_id':   t.employee_id,
+            'employee_name': t.employee.name if t.employee else None,
+            'period_type':   t.period_type,
+            'period_key':    t.period_key,
+            'target_amount': t.target_amount
+        } for t in targets
+    ]
+
+
+@router.post("/targets")
+def set_target(
+    payload: schemas.SaleTargetCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    if current_user.role not in ('admin', 'manager'):
+        raise HTTPException(status_code=403, detail='Only admins/managers can set targets')
+
+    # Validate employee exists
+    emp = db.query(models.Employee).filter(models.Employee.id == payload.employee_id).first()
+    if not emp:
+        raise HTTPException(status_code=404, detail='Employee not found')
+
+    # Upsert: update if exists, else create
+    existing = db.query(models.SaleTarget).filter(
+        models.SaleTarget.employee_id == payload.employee_id,
+        models.SaleTarget.period_type  == payload.period_type,
+        models.SaleTarget.period_key   == payload.period_key
+    ).first()
+
+    if existing:
+        existing.target_amount = payload.target_amount
+        db.commit()
+        db.refresh(existing)
+        t = existing
+    else:
+        t = models.SaleTarget(
+            employee_id=payload.employee_id,
+            period_type=payload.period_type,
+            period_key=payload.period_key,
+            target_amount=payload.target_amount
+        )
+        db.add(t)
+        db.commit()
+        db.refresh(t)
+
+    return {
+        'id': t.id, 'employee_id': t.employee_id,
+        'employee_name': emp.name,
+        'period_type': t.period_type, 'period_key': t.period_key,
+        'target_amount': t.target_amount
+    }
+
+
+@router.delete("/targets/{target_id}")
+def delete_target(
+    target_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    if current_user.role not in ('admin', 'manager'):
+        raise HTTPException(status_code=403, detail='Only admins/managers can delete targets')
+    t = db.query(models.SaleTarget).filter(models.SaleTarget.id == target_id).first()
+    if not t:
+        raise HTTPException(status_code=404, detail='Target not found')
+    db.delete(t)
+    db.commit()
+    return {'message': 'Target deleted'}

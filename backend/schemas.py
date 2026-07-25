@@ -504,3 +504,41 @@ class CollectionOut(BaseModel):
         from_attributes = True
 
 
+# ─── Sale Targets ─────────────────────────────────────────
+class SaleTargetCreate(BaseModel):
+    employee_id: int
+    period_type: str        # "monthly" | "weekly"
+    period_key: str         # "2025-07" | "2025-W30"
+    target_amount: float
+
+
+class SaleTargetOut(BaseModel):
+    id: int
+    employee_id: int
+    employee_name: Optional[str] = None
+    period_type: str
+    period_key: str
+    target_amount: float
+
+    class Config:
+        from_attributes = True
+
+
+# ─── Employee Analytics ───────────────────────────────────
+class EmployeeMonthlyRow(BaseModel):
+    employee_id: int
+    employee_name: str
+    period_key: str          # "2025-07"
+    total_amount: float
+    order_count: int
+    target_amount: Optional[float] = None
+
+
+class EmployeeWeeklyRow(BaseModel):
+    employee_id: int
+    employee_name: str
+    period_key: str          # "2025-W30"
+    week_label: str          # "Week 30 (Jul 21-27)"
+    total_amount: float
+    order_count: int
+    target_amount: Optional[float] = None
