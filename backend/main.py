@@ -82,3 +82,11 @@ app.include_router(collections.router)
 @app.get("/")
 def root():
     return {"message": "SHREYANSH VOLLORA API is running", "docs": "/docs"}
+
+
+@app.get("/ping")
+def ping():
+    """Public keep-alive endpoint — no auth, no DB hit.
+    Ping this every 14 minutes (e.g. via UptimeRobot) to prevent
+    Render free-tier cold starts."""
+    return {"status": "ok"}
