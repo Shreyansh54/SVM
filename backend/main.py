@@ -8,8 +8,11 @@ if os.path.exists(".env"):
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from database import engine, Base
+from database import engine, Base, wait_for_db
 from routers import auth, employees, stockists, products, stock, sales, attendance, salary, dashboard, doctors, export, upload, batches, invoices, audit, collections
+
+# ── Wait for Neon DB to wake up (handles auto-suspend cold starts) ──
+wait_for_db()
 
 # Create all new tables
 Base.metadata.create_all(bind=engine)
